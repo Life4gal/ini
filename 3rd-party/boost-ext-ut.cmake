@@ -1,0 +1,8 @@
+CPMFindPackage(
+		NAME ut
+		GIT_TAG v1.1.9
+		GITHUB_REPOSITORY "boost-ext/ut"
+		OPTIONS "BOOST_UT_USE_WARNINGS_AS_ERORS ON"
+)
+
+CPM_link_libraries_APPEND(ut PRIVATE)
