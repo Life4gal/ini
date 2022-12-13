@@ -1,6 +1,6 @@
 ﻿cmake_minimum_required(VERSION 3.20)
 
-set(PROJECT_NAME_PREFIX "CMakeTemplateProject_")
+set(PROJECT_NAME_PREFIX "GAL_INI_")
 
 set(
 		${PROJECT_NAME_PREFIX}MAJOR_VERSION
@@ -9,21 +9,21 @@ set(
 
 set(
 		${PROJECT_NAME_PREFIX}MINOR_VERSION
-		1
+		0
 )
 
 set(
 		${PROJECT_NAME_PREFIX}PATCH_VERSION
-		0
+		1
 )
 
 set(${PROJECT_NAME_PREFIX}VERSION ${${PROJECT_NAME_PREFIX}MAJOR_VERSION}.${${PROJECT_NAME_PREFIX}MINOR_VERSION}.${${PROJECT_NAME_PREFIX}PATCH_VERSION})
 
 project(
-		CMakeTemplateProject
+		GAL-INI-READER
 		VERSION ${${PROJECT_NAME_PREFIX}VERSION}
-		DESCRIPTION "CMake Template Project"
-		HOMEPAGE_URL "https://github.com/Life4gal/CMakeTemplateProject"
+		DESCRIPTION "GAL INI READER"
+		HOMEPAGE_URL "https://github.com/Life4gal/ini"
 		LANGUAGES CXX
 )
 
@@ -45,7 +45,7 @@ include(${${PROJECT_NAME_PREFIX}CMAKE_MODULE_PATH}/turn_off_warning.cmake)
 include(cpm/cpm_config.cmake)
 include(cpm/CPM.cmake)
 
-add_subdirectory(${PROJECT_NAME})
+add_subdirectory(ini)
 enable_testing()
 add_subdirectory(standalone_test)
 add_subdirectory(unit_test)

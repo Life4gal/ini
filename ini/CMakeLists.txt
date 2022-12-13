@@ -1,5 +1,5 @@
 project(
-	CMakeTemplateProject-impl
+	GAL-INI-READER
 	LANGUAGES CXX
 )
 
@@ -29,10 +29,7 @@ target_include_directories(
 )
 
 CPM_link_libraries_DECL()
-include(${${PROJECT_NAME_PREFIX}CMAKE_3RDPARTY_PATH}/fmtlib.cmake)
-include(${${PROJECT_NAME_PREFIX}CMAKE_3RDPARTY_PATH}/spdlog.cmake)
-include(${${PROJECT_NAME_PREFIX}CMAKE_3RDPARTY_PATH}/eve.cmake)
-include(${${PROJECT_NAME_PREFIX}CMAKE_3RDPARTY_PATH}/bdwgc.cmake)
+include(${${PROJECT_NAME_PREFIX}CMAKE_3RDPARTY_PATH}/lexy.cmake)
 CPM_link_libraries_LINK(${PROJECT_NAME}-objlib)
 
 # shared and static libraries built from the same object files
@@ -100,13 +97,13 @@ project_setup(${PROJECT_NAME}-static)
 # todo: library name?
 
 add_library(
-	gal::CTP-static
+	gal::ini-static
 	ALIAS
 	${PROJECT_NAME}-static
 )
 
 add_library(
-		gal::CTP-shared
+		gal::ini-shared
 		ALIAS
 		${PROJECT_NAME}-shared
 )

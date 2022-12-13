@@ -34,7 +34,7 @@ CPM_link_libraries_LINK(${PROJECT_NAME})
 target_link_libraries(
 		${PROJECT_NAME}
 		PRIVATE
-		gal::CTP-shared
+		gal::ini-shared
 )
 
 # cmake try to find 'bin\CMakeTemplateProject-impl-shared.lib' but it not exist if did not exported any symbol...
