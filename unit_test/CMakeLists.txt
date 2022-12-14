@@ -1,5 +1,5 @@
 project(
-		CMakeTemplateProject-unit-test
+		GAL-INI-unit-test
 		LANGUAGES CXX
 )
 

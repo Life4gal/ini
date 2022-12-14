@@ -1,5 +1,5 @@
 project(
-		CMakeTemplateProject-standalone-test
+		GAL-INI-standalone-test
 		LANGUAGES CXX
 )
 
