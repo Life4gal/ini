@@ -35,23 +35,43 @@ namespace gal::ini
 		{
 			if constexpr (std::is_same_v<Char, wchar_t>)
 			{
-				return L"\r\n";
+#ifdef GAL_INI_COMPILER_MSVC
+				return L"\n";
+#else
+				   return L"\r\n";
+#endif
 			}
 			else if constexpr (std::is_same_v<Char, char8_t>)
 			{
-				return u8"\r\n";
+#ifdef GAL_INI_COMPILER_MSVC
+				return u8"\n";
+#else
+				   return u8"\r\n";
+#endif
 			}
 			else if constexpr (std::is_same_v<Char, char16_t>)
 			{
-				return u"\r\n";
+#ifdef GAL_INI_COMPILER_MSVC
+				return u"\n";
+#else
+				   return u"\r\n";
+#endif
 			}
 			else if constexpr (std::is_same_v<Char, char32_t>)
 			{
-				return U"\r\n";
+#ifdef GAL_INI_COMPILER_MSVC
+				return U"\n";
+#else
+				   return U"\r\n";
+#endif
 			}
 			else
 			{
-				return "\r\n";
+#ifdef GAL_INI_COMPILER_MSVC
+				return "\n";
+#else
+				   return "\r\n";
+#endif
 			}
 		}
 	}// namespace ini_detail
@@ -107,7 +127,7 @@ namespace gal::ini
 #ifdef GAL_INI_COMPILER_GNU
 			current_group_ = context_.find(string_type{group_name});
 #else
-			   current_group_ = context_.find(group_name);
+			current_group_ = context_.find(group_name);
 #endif
 		}
 
@@ -147,7 +167,7 @@ namespace gal::ini
 #ifdef GAL_INI_COMPILER_GNU
 							group.find(string_type{key});
 #else
-							   group.find(key);
+							group.find(key);
 #endif
 
 					it != group.end())
