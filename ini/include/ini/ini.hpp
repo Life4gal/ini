@@ -9,6 +9,7 @@
 #endif
 
 #include <string_view>
+#include <type_traits>
 
 namespace gal::ini
 {
@@ -26,6 +27,34 @@ namespace gal::ini
 #else
 	using map_type	  = GAL_INI_MAP_TYPE<Key, Value, Hash, KeyComparator>;
 #endif
+
+	namespace ini_detail
+	{
+		template<typename Char>
+		[[nodiscard]] consteval auto line_separator() noexcept
+		{
+			if constexpr (std::is_same_v<Char, wchar_t>)
+			{
+				return L"\r\n";
+			}
+			else if constexpr (std::is_same_v<Char, char8_t>)
+			{
+				return u8"\r\n";
+			}
+			else if constexpr (std::is_same_v<Char, char16_t>)
+			{
+				return u"\r\n";
+			}
+			else if constexpr (std::is_same_v<Char, char32_t>)
+			{
+				return U"\r\n";
+			}
+			else
+			{
+				return "\r\n";
+			}
+		}
+	}// namespace ini_detail
 
 	class Ini
 	{
@@ -63,7 +92,7 @@ namespace gal::ini
 	public:
 		explicit Ini(string_type&& filename);
 
-		//		explicit Ini(string_view_type filename) : Ini{string_type{filename}} {}
+		// explicit Ini(string_view_type filename) : Ini{string_type{filename}} {}
 
 		~Ini() noexcept;
 
@@ -72,7 +101,15 @@ namespace gal::ini
 		auto operator=(const Ini&) = delete;
 		auto operator=(Ini&&)	   = delete;
 
-		auto begin_group(const string_view_type group_name) -> void { current_group_ = context_.find(group_name); }
+		auto begin_group(const string_view_type group_name) -> void
+		{
+			// todo
+#ifdef GAL_INI_COMPILER_GNU
+			current_group_ = context_.find(string_type{group_name});
+#else
+			   current_group_ = context_.find(group_name);
+#endif
+		}
 
 		template<typename ValueType>
 		auto value(const string_type& key, ValueType&& value) -> void
@@ -105,8 +142,18 @@ namespace gal::ini
 			if (current_group_ != context_.end())
 			{
 				auto& [_, group] = *current_group_;
-				if (const auto it = group.find(key);
-					it != group.end()) { return it->second; }
+				if (const auto it =
+				// todo
+#ifdef GAL_INI_COMPILER_GNU
+							group.find(string_type{key});
+#else
+							   group.find(key);
+#endif
+
+					it != group.end())
+				{
+					return it->second;
+				}
 			}
 
 			return key_not_exist;
@@ -125,7 +172,7 @@ namespace gal::ini
 		}
 
 		template<typename OStream>
-		auto print(OStream& out) const
+		auto print(OStream& out, const string_view_type separator = ini_detail::line_separator<string_view_type::value_type>()) const
 			requires requires {
 						 out << "test";
 						 out << string_type{};
@@ -133,15 +180,10 @@ namespace gal::ini
 		{
 			for (const auto& [group_name, variables]: context_)
 			{
-				out << "[" << group_name << "]\n";
+				out << "[" << group_name << "]" << separator.data();
 				for (const auto& [variable_key, variable_value]: variables)
 				{
-					out << variable_key << "=" << variable_value << variable_value;
-					// todo
-					if (!variable_value.ends_with('\n') || !variable_value.ends_with('\r'))
-					{
-						out << '\n';
-					}
+					out << variable_key << "=" << variable_value << separator.data();
 				}
 			}
 		}

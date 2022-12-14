@@ -104,16 +104,16 @@ namespace gal::ini
 			  filename_{filename},
 			  ini_{ini} {}
 
-		//		ParseState(const ParseState&)	  = delete;
-		//		ParseState(ParseState&&)		  = delete;
-		//		auto operator=(const ParseState&) = delete;
-		//		auto operator=(ParseState&&)	  = delete;
+		// ParseState(const ParseState&)	  = delete;
+		// ParseState(ParseState&&)		  = delete;
+		// auto operator=(const ParseState&) = delete;
+		// auto operator=(ParseState&&)	  = delete;
 		//
-		//		~ParseState() noexcept
-		//		{
-		//			// reset group iterator
-		//			ini_.current_group_ = ini_.context_.end();
-		//		}
+		// ~ParseState() noexcept
+		// {
+		// 	// reset group iterator
+		// 	ini_.current_group_ = ini_.context_.end();
+		// }
 
 		auto begin_parse() -> void;
 
@@ -138,7 +138,7 @@ namespace gal::ini
 			auto [it, inserted] = group.try_emplace(std::move(key), std::move(value));
 			if (!inserted) { report_duplicate_declaration(position, it->first, "variable"); }
 
-//			debug_print_variable(position, it->first, "variable");
+			// debug_print_variable(position, it->first, "variable");
 		}
 	};
 }// namespace gal::ini
@@ -165,52 +165,52 @@ namespace
 
 		struct variable
 		{
-			//			struct invalid_char
-			//			{
-			//				static LEXY_CONSTEVAL auto name() { return "invalid character in string literal"; }
-			//			};
+			// struct invalid_char
+			// {
+			// 	static LEXY_CONSTEVAL auto name() { return "invalid character in string literal"; }
+			// };
 			//
-			//			// A mapping of the simple escape sequences to their replacement values.
-			//			static constexpr auto escaped_symbols = lexy::symbol_table<char>//
-			//															.map<'"'>('"')
-			//															.map<'\\'>('\\')
-			//															.map<'/'>('/')
-			//															.map<'b'>('\b')
-			//															.map<'f'>('\f')
-			//															.map<'n'>('\n')
-			//															.map<'r'>('\r')
-			//															.map<'t'>('\t');
+			// // A mapping of the simple escape sequences to their replacement values.
+			// static constexpr auto escaped_symbols = lexy::symbol_table<char>//
+			// 												.map<'"'>('"')
+			// 												.map<'\\'>('\\')
+			// 												.map<'/'>('/')
+			// 												.map<'b'>('\b')
+			// 												.map<'f'>('\f')
+			// 												.map<'n'>('\n')
+			// 												.map<'r'>('\r')
+			// 												.map<'t'>('\t');
 			//
-			//			struct code_point_id
-			//			{
-			//				// We parse the integer value of a UTF-16 code unit.
-			//				static constexpr auto rule	= LEXY_LIT("u") >> dsl::code_unit_id<lexy::utf16_encoding, 4>;
-			//				// And convert it into a code point, which might be a surrogate.
-			//				static constexpr auto value = lexy::construct<lexy::code_point>;
-			//			};
+			// struct code_point_id
+			// {
+			// 	// We parse the integer value of a UTF-16 code unit.
+			// 	static constexpr auto rule	= LEXY_LIT("u") >> dsl::code_unit_id<lexy::utf16_encoding, 4>;
+			// 	// And convert it into a code point, which might be a surrogate.
+			// 	static constexpr auto value = lexy::construct<lexy::code_point>;
+			// };
 			//
-			//			static constexpr auto rule = []
-			//			{
-			//				// Everything is allowed inside a string except for control characters.
-			//				auto code_point = (-dsl::unicode::control).error<invalid_char>;
+			// static constexpr auto rule = []
+			// {
+			// 	// Everything is allowed inside a string except for control characters.
+			// 	auto code_point = (-dsl::unicode::control).error<invalid_char>;
 			//
-			//				// Escape sequences start with a backlash and either map one of the symbols,
-			//				// or a Unicode code point.
-			//				auto escape		= dsl::backslash_escape.symbol<escaped_symbols>().rule(dsl::p<code_point_id>);
+			// 	// Escape sequences start with a backlash and either map one of the symbols,
+			// 	// or a Unicode code point.
+			// 	auto escape		= dsl::backslash_escape.symbol<escaped_symbols>().rule(dsl::p<code_point_id>);
 			//
-			//				// String of code_point with specified escape sequences, surrounded by ".
-			//				// We abort string parsing if we see a newline to handle missing closing ".
-			//				return dsl::quoted.limit(dsl::ascii::newline)(code_point, escape);
-			//			}();
+			// 	// String of code_point with specified escape sequences, surrounded by ".
+			// 	// We abort string parsing if we see a newline to handle missing closing ".
+			// 	return dsl::quoted.limit(dsl::ascii::newline)(code_point, escape);
+			// }();
 
 			constexpr static auto rule =
 					dsl::identifier(
 							// begin with printable
 							dsl::unicode::print,
-							// continue with printable
-							dsl::unicode::print);
+							// continue with printable, but excluding '\r', '\n' and '\r\n'
+							dsl::unicode::print - dsl::unicode::newline);
 
-			static constexpr auto value = lexy::as_string<ini::string_type, ini::ParseState::context_type::encoding>;
+			constexpr static auto value = lexy::as_string<ini::string_type, ini::ParseState::context_type::encoding>;
 		};
 
 		// identifier = [variable]
@@ -252,8 +252,16 @@ namespace
 
 			constexpr static auto rule =
 					dsl::p<header> +
+					// dsl::unicode::newline +
 					// variables
-					dsl::recurse<variable_declaration>;
+					// dsl::recurse<variable_declaration>;
+					// dsl::recurse_branch<variable_declaration>;
+
+					// dsl::list(dsl::p<variable_declaration>, dsl::sep(dsl::unicode::newline));
+					// dsl::list(dsl::p<variable_declaration>);
+
+					// dsl::terminator(dsl::eof | dsl::square_bracketed.open()).opt_list(dsl::p<variable_declaration>, dsl::sep(dsl::unicode::newline));
+					dsl::terminator(dsl::eof | dsl::peek(dsl::square_bracketed.open())).opt_list(dsl::p<variable_declaration>);
 
 			constexpr static auto value = lexy::forward<void>;
 		};
@@ -263,14 +271,12 @@ namespace
 			constexpr static auto whitespace =
 					// space
 					dsl::ascii::blank |
-					// new line
-					dsl::newline |
+					// The newline character is treated as a whitespace here, allowing us to skip the newline character, but this also leads to our above branching rules can no longer rely on the newline character.
+					dsl::unicode::newline |
 					// comment
 					dsl::hash_sign >> dsl::until(dsl::newline);
 
-			constexpr static auto rule =
-					dsl::terminator(dsl::eof).opt_list(
-							dsl::p<group_declaration>);
+			constexpr static auto rule	= dsl::terminator(dsl::eof).opt_list(dsl::p<group_declaration>);
 
 			constexpr static auto value = lexy::forward<void>;
 		};
