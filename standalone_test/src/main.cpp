@@ -9,6 +9,6 @@ auto main() -> int
 			  << "\nINI Version: " << GAL_INI_VERSION
 			  << '\n';
 
-	const gal::ini::Ini ini{"test.ini"};
+	const gal::ini::IniReader ini{"test.ini"};
 	ini.print(std::cout);
 }

@@ -1,5 +1,5 @@
 project(
-		GAL-INI-READER
+		GAL-INI-PARSER
 		LANGUAGES CXX
 )
 

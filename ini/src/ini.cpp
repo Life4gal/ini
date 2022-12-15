@@ -1,12 +1,15 @@
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
-#include <ini/impl/ini_v2.hpp>
+#include <ini/ini.hpp>
 #include <lexy/action/parse.hpp>
 #include <lexy/callback.hpp>
 #include <lexy/dsl.hpp>
 #include <lexy/input/file.hpp>
 #include <lexy/visualize.hpp>
 #include <lexy_ext/report_error.hpp>
+#include <memory>
+#include <ranges>
 
 namespace
 {
@@ -25,12 +28,21 @@ namespace
 		}
 	}
 
-	using group_type   = ini::group_type;
-	using context_type = ini::context_type;
-
-	template<typename Encoding>
+	template<typename Impl, typename Ini, typename Encoding>
 	class ParseState
 	{
+		using impl_type = Impl;
+
+		[[nodiscard]] constexpr auto rep() const -> const impl_type&
+		{
+			return static_cast<const impl_type&>(*this);
+		}
+
+		[[nodiscard]] constexpr auto rep() -> impl_type&
+		{
+			return static_cast<impl_type&>(*this);
+		}
+
 	public:
 		template<typename Return, typename... Functions>
 		[[nodiscard]] constexpr static auto callback(Functions&&... functions)
@@ -49,17 +61,21 @@ namespace
 
 		static_assert(std::is_same_v<encoding, typename buffer_type::encoding>);
 
+		using ini_type	  = Ini;
+		using writer_type = ini_type::writer_type;
+		using group_type  = ini_type::group_type;
+
 	private:
-		buffer_type								 buffer_;
+		const buffer_type&						 buffer_;
 		lexy::input_location_anchor<buffer_type> buffer_anchor_;
 
 		ini::filename_view_type					 filename_;
 
-		context_type							 context_;
-		context_type::iterator					 current_group_;
+	protected:
+		ini_type&					 ini_;
+		std::unique_ptr<writer_type> writer_;
 
-	private:
-		auto report_duplicate_declaration(const char_type* position, const ini::string_view_type identifier, const ini::string_view_type category) const -> void
+		auto						 report_duplicate_declaration(const char_type* position, const ini::string_view_type identifier, const ini::string_view_type category) const -> void
 		{
 			const auto						  location = lexy::get_input_location(buffer_, position, buffer_anchor_);
 
@@ -100,7 +116,7 @@ namespace
 									   lexy_ext::diagnostic_kind::info,
 									   [&](lexy::cfile_output_iterator, lexy::visualization_options)
 									   {
-										   (void)std::fprintf(stderr, "[%s]: %s = %s", to_char_string(current_group_->first).data(), to_char_string(key).data(), to_char_string(value).data());
+										   (void)std::fprintf(stderr, "[%s]: %s = %s", to_char_string(writer_->name()).data(), to_char_string(key).data(), to_char_string(value).data());
 										   return out;
 									   });
 
@@ -122,48 +138,59 @@ namespace
 	public:
 		ParseState(
 				const ini::filename_view_type filename,
-				buffer_type&&				  buffer)
-			: buffer_{std::move(buffer)},
-			  buffer_anchor_{this->buffer_},
+				const buffer_type&			  buffer,
+				ini_type&					  ini)
+			: buffer_{buffer},
+			  buffer_anchor_{buffer_},
 			  filename_{filename},
-			  context_{},
-			  current_group_{context_.end()} {}
-
-		auto buffer() & -> buffer_type&
-		{
-			return buffer_;
-		}
-
-		auto context() & -> context_type&
-		{
-			return context_;
-		}
-
-		auto context() && -> context_type&&
-		{
-			return std::move(context_);
-		}
+			  ini_{ini},
+			  writer_{nullptr} {}
 
 		auto begin_group(const char_type* position, ini::string_type&& group_name) -> void
 		{
-			// [[maybe_unused]] const auto location = lexy::get_input_location(buffer_, position, buffer_anchor_);
-
-			auto [it, inserted] = context_.try_emplace(std::move(group_name), group_type{});
-			if (!inserted) { report_duplicate_declaration(position, it->first, "group"); }
-
-			current_group_ = it;
+			rep().do_begin_group(position, std::move(group_name));
 		}
 
 		auto value(const char_type* position, ini::string_type&& key, ini::string_type&& value) -> void
 		{
+			rep().do_value(position, std::move(key), std::move(value));
+		}
+	};
+
+	template<typename Encoding>
+	class UnorderedParseState final : public ParseState<UnorderedParseState<Encoding>, ini::impl::IniReader, Encoding>
+	{
+		using parent = ParseState<UnorderedParseState<Encoding>, ini::impl::IniReader, Encoding>;
+		friend parent;
+
+	public:
+		using ParseState<UnorderedParseState<Encoding>, ini::impl::IniReader, Encoding>::ParseState;
+
+	private:
+		auto do_begin_group(const typename parent::char_type* position, ini::string_type&& group_name) -> void
+		{
 			// [[maybe_unused]] const auto location = lexy::get_input_location(buffer_, position, buffer_anchor_);
 
-			// Our parse ensures the current_group is valid
-			auto& [_, group]	= *current_group_;
-			auto [it, inserted] = group.try_emplace(std::move(key), std::move(value));
-			if (!inserted) { report_duplicate_declaration(position, it->first, "variable"); }
+			this->writer_ = std::make_unique<typename parent::writer_type>(this->ini_.write(std::move(group_name)));
 
-			// debug_print_variable(position, it->first, "variable");
+
+			if (!this->writer_->empty())
+			{
+				// If we get here, it means that a group with the same name already exists before, then this 'group_name' will not be consumed because of move.
+				this->report_duplicate_declaration(position, group_name, "group");
+			}
+		}
+
+		auto do_value(const typename parent::char_type* position, ini::string_type&& key, ini::string_type&& value) -> void
+		{
+			// [[maybe_unused]] const auto location = lexy::get_input_location(buffer_, position, buffer_anchor_);
+
+			// Our parse ensures the writer is valid
+			if (!this->writer_->try_insert(std::move(key), std::move(value)))
+			{
+				// If we get here, it means that a key with the same name already exists before, then this 'key' will not be consumed because of move.
+				this->report_duplicate_declaration(position, key, "variable");
+			}
 		}
 	};
 
@@ -306,45 +333,320 @@ namespace
 			constexpr static auto value = lexy::forward<void>;
 		};
 	}// namespace grammar
+}// namespace
 
-	auto read(ini::filename_view_type filename) -> context_type
+namespace gal::ini::impl
+{
+	namespace detail
+	{
+		auto GroupAccessor<GroupProperty::READ_MODIFY>::insert_or_assign(node_type&& node) -> bool
+		{
+			auto&& [key, value]		  = std::move(node);
+			const auto [it, inserted] = group_.insert_or_assign(std::move(key), std::move(value));
+			return inserted;
+		}
+
+		auto GroupAccessor<GroupProperty::READ_ORDERED>::get_it(group_type& group, string_view_type key) -> group_type::iterator
+		{
+			const auto it = std::ranges::find(
+					group | std::views::values,
+					key,
+					[](const auto& pair) -> const auto&
+					{
+						return pair.first;
+					});
+
+			return it.base();
+		}
+
+		auto GroupAccessor<GroupProperty::READ_ORDERED>::get_it(const group_type& group, string_view_type key) -> group_type::const_iterator
+		{
+			return get_it(const_cast<group_type&>(group), key);
+		}
+
+		auto GroupAccessor<GroupProperty::READ_ORDERED>::contains(const string_view_type key) const -> bool
+		{
+			return get_it(group_, key) != group_.end();
+		}
+
+		auto GroupAccessor<GroupProperty::READ_ORDERED>::get(string_view_type key) const -> string_view_type
+		{
+			if (const auto it = get_it(group_, key);
+				it != group_.end())
+			{
+				return it->second.second;
+			}
+
+			return {};
+		}
+
+		auto GroupAccessor<GroupProperty::READ_MODIFY_ORDERED>::try_insert(const string_type& key, string_type&& value) -> bool
+		{
+			// try to find it
+			if (const auto it = read_accessor_type::get_it(group_, key);
+				it != group_.end())
+			{
+				// found it, ignore it
+				return false;
+			}
+			else
+			{
+				group_.emplace(static_cast<line_type>(size()), group_type::mapped_type{key, std::move(value)});
+				return true;
+			}
+		}
+
+		auto GroupAccessor<GroupProperty::READ_MODIFY_ORDERED>::try_insert(string_type&& key, string_type&& value) -> bool
+		{
+			// try to find it
+			if (const auto it = read_accessor_type::get_it(group_, key);
+				it != group_.end())
+			{
+				// found it, ignore it
+				return false;
+			}
+			else
+			{
+				group_.emplace(static_cast<line_type>(size()), group_type::mapped_type{std::move(key), std::move(value)});
+				return true;
+			}
+		}
+
+		auto GroupAccessor<GroupProperty::READ_MODIFY_ORDERED>::try_insert(node_type&& node) -> bool
+		{
+			// try to find it
+			if (const auto it = read_accessor_type::get_it(group_, node.key());
+				it != group_.end())
+			{
+				// found it, ignore it
+				return false;
+			}
+			else
+			{
+				return group_.insert(std::move(node)) != group_.end();
+			}
+		}
+
+		auto GroupAccessor<GroupProperty::READ_MODIFY_ORDERED>::insert_or_assign(const string_type& key, string_type&& value) -> bool
+		{
+			// try to find it
+			if (auto it = read_accessor_type::get_it(group_, key);
+				it != group_.end())
+			{
+				// found it, assign it
+				it->second.second = std::move(value);
+				return false;
+			}
+			else
+			{
+				group_.emplace(static_cast<line_type>(size()), group_type::mapped_type{key, std::move(value)});
+				return true;
+			}
+		}
+
+		auto GroupAccessor<GroupProperty::READ_MODIFY_ORDERED>::insert_or_assign(string_type&& key, string_type&& value) -> bool
+		{
+			// try to find it
+			if (auto it = read_accessor_type::get_it(group_, key);
+				it != group_.end())
+			{
+				// found it, assign it
+				it->second.second = std::move(value);
+				return false;
+			}
+			else
+			{
+				group_.emplace(static_cast<line_type>(size()), group_type::mapped_type{std::move(key), std::move(value)});
+				return true;
+			}
+		}
+
+		auto GroupAccessor<GroupProperty::READ_MODIFY_ORDERED>::insert_or_assign(node_type&& node) -> bool
+		{
+			// try to find it
+			if (auto it = read_accessor_type::get_it(group_, node.key());
+				it != group_.end())
+			{
+				// found it, assign it
+				it->second.second = std::move(node).value();
+				return false;
+			}
+			else
+			{
+				return group_.insert(std::move(node)) != group_.end();
+			}
+		}
+
+		auto GroupAccessor<GroupProperty::READ_MODIFY_ORDERED>::get_it(string_view_type target_key, string_view_type key) -> std::pair<group_type::iterator, group_type::iterator>
+		{
+			// try to find target key
+			if (auto target_it = read_accessor_type::get_it(group_, target_key);
+				target_it == group_.end())
+			{
+				// not found, ignore it;
+				return {group_.end(), group_.end()};
+			}
+			else
+			{
+				// try to find this key
+				return {target_it, read_accessor_type::get_it(group_, key)};
+			}
+		}
+
+		auto GroupAccessor<GroupProperty::READ_MODIFY_ORDERED>::try_insert_before(const string_view_type target_key, const string_view_type key, string_type&& value) -> bool
+		{
+			if (const auto target_it = get_it(target_key, key).first;
+				target_it != group_.end())
+			{
+				// insert it into the 'same' line of the target, but the new value 'insertion order' is specified before target.
+				return group_.emplace_hint(target_it, target_it->first, group_type::mapped_type{key, std::move(value)}) != group_.end();
+			}
+
+			return false;
+		}
+
+		auto GroupAccessor<GroupProperty::READ_MODIFY_ORDERED>::try_insert_before(string_view_type target_key, string_type&& key, string_type&& value) -> bool
+		{
+			if (const auto target_it = get_it(target_key, key).first;
+				target_it != group_.end())
+			{
+				// insert it into the 'same' line of the target, but the new value 'insertion order' is specified before target.
+				return group_.emplace_hint(target_it, target_it->first, group_type::mapped_type{std::move(key), std::move(value)}) != group_.end();
+			}
+
+			return false;
+		}
+
+		auto GroupAccessor<GroupProperty::READ_MODIFY_ORDERED>::try_insert_after(const string_view_type target_key, const string_view_type key, string_type&& value) -> bool
+		{
+			if (auto target_it = get_it(target_key, key).first;
+				target_it != group_.end())
+			{
+				// insert it into the 'same' line of the target, but the new value 'insertion order' is specified before target.
+				return group_.emplace_hint(++target_it, target_it->first, group_type::mapped_type{key, std::move(value)}) != group_.end();
+			}
+
+			return false;
+		}
+
+		auto GroupAccessor<GroupProperty::READ_MODIFY_ORDERED>::try_insert_after(string_view_type target_key, string_type&& key, string_type&& value) -> bool
+		{
+			if (auto target_it = get_it(target_key, key).first;
+				target_it != group_.end())
+			{
+				// insert it into the 'same' line of the target, but the new value 'insertion order' is specified before target.
+				return group_.emplace_hint(++target_it, target_it->first, group_type::mapped_type{std::move(key), std::move(value)}) != group_.end();
+			}
+
+			return false;
+		}
+
+		auto GroupAccessor<GroupProperty::READ_MODIFY_ORDERED>::insert_or_assign_before(string_view_type target_key, string_view_type key, string_type&& value) -> bool
+		{
+			if (const auto [target_it, it] = get_it(target_key, key);
+				target_it != group_.end())
+			{
+				// already exists
+				if (it != group_.end())
+				{
+					// extract it
+					auto&& node			 = group_.extract(it);
+					node.key()			 = target_it->first;
+					node.mapped().second = std::move(value);
+					// insert back
+					return group_.insert(target_it, std::move(node)) != group_.end();
+				}
+
+				// emplace new one
+				// insert it into the 'same' line of the target, but the new value 'insertion order' is specified before target.
+				return group_.emplace_hint(target_it, target_it->first, group_type::mapped_type{key, std::move(value)}) != group_.end();
+			}
+
+			return false;
+		}
+
+		auto GroupAccessor<GroupProperty::READ_MODIFY_ORDERED>::insert_or_assign_before(string_view_type target_key, string_type&& key, string_type&& value) -> bool
+		{
+			if (const auto [target_it, it] = get_it(target_key, key);
+				target_it != group_.end())
+			{
+				// already exists
+				if (it != group_.end())
+				{
+					// extract it
+					auto&& node			 = group_.extract(it);
+					node.key()			 = target_it->first;
+					node.mapped().second = std::move(value);
+					// insert back
+					return group_.insert(target_it, std::move(node)) != group_.end();
+				}
+
+				// emplace new one
+				// insert it into the 'same' line of the target, but the new value 'insertion order' is specified before target.
+				return group_.emplace_hint(target_it, target_it->first, group_type::mapped_type{std::move(key), std::move(value)}) != group_.end();
+			}
+
+			return false;
+		}
+
+		auto GroupAccessor<GroupProperty::READ_MODIFY_ORDERED>::insert_or_assign_after(string_view_type target_key, string_view_type key, string_type&& value) -> bool
+		{
+			if (auto [target_it, it] = get_it(target_key, key);
+				target_it != group_.end())
+			{
+				// already exists
+				if (it != group_.end())
+				{
+					// extract it
+					auto&& node			 = group_.extract(it);
+					node.key()			 = target_it->first;
+					node.mapped().second = std::move(value);
+					// insert back
+					return group_.insert(target_it, std::move(node)) != group_.end();
+				}
+
+				// emplace new one
+				// insert it into the 'same' line of the target, but the new value 'insertion order' is specified before target.
+				return group_.emplace_hint(++target_it, target_it->first, group_type::mapped_type{key, std::move(value)}) != group_.end();
+			}
+
+			return false;
+		}
+
+		auto GroupAccessor<GroupProperty::READ_MODIFY_ORDERED>::insert_or_assign_after(string_view_type target_key, string_type&& key, string_type&& value) -> bool
+		{
+			if (auto [target_it, it] = get_it(target_key, key);
+				target_it != group_.end())
+			{
+				// already exists
+				if (it != group_.end())
+				{
+					// extract it
+					auto&& node			 = group_.extract(it);
+					node.key()			 = target_it->first;
+					node.mapped().second = std::move(value);
+					// insert back
+					return group_.insert(target_it, std::move(node)) != group_.end();
+				}
+
+				// emplace new one
+				// insert it into the 'same' line of the target, but the new value 'insertion order' is specified before target.
+				return group_.emplace_hint(++target_it, target_it->first, group_type::mapped_type{std::move(key), std::move(value)}) != group_.end();
+			}
+
+			return false;
+		}
+	}// namespace detail
+
+	IniReader::IniReader(filename_view_type filename)
 	{
 		// todo: encoding?
 		auto file = lexy::read_file<lexy::utf8_encoding>(filename.data());
 
 		if (file)
 		{
-			ParseState state{filename, std::move(file).buffer()};
-			lexy::parse<grammar::file<std::decay_t<decltype(state)>>>(state.buffer(), state, lexy_ext::report_error.opts({.flags = lexy::visualize_fancy}).path(filename.data()));
-			return std::move(state).context();
+			UnorderedParseState<lexy::utf8_encoding> state{filename, file.buffer(), *this};
+			lexy::parse<grammar::file<std::decay_t<decltype(state)>>>(file.buffer(), state, lexy_ext::report_error.opts({.flags = lexy::visualize_fancy}).path(filename.data()));
 		}
-
-		// todo
-		return {};
 	}
-}// namespace
-
-namespace gal::ini::impl::inline v2
-{
-	Ini::Ini(filename_type&& filename)
-		: filename_{std::move(filename)},
-		  context_{read(filename_)},
-		  current_group_{context_.end()}
-	{
-	}
-
-	auto Ini::flush() const -> void
-	{
-		std::ofstream file{filename_.c_str(), std::ios::out | std::ios::trunc};
-
-		if (!file.is_open())
-		{
-			// todo
-			return;
-		}
-
-		print(file);
-
-		file.close();
-	}
-}// namespace gal::ini::impl::inline v2
+}// namespace gal::ini::impl
