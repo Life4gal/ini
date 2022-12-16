@@ -5,4 +5,5 @@
 namespace gal::ini
 {
 	using impl::IniReader;
+	using impl::IniReaderWithComment;
 }

@@ -9,6 +9,13 @@ auto main() -> int
 			  << "\nINI Version: " << GAL_INI_VERSION
 			  << '\n';
 
+	std::cout << "=== unordered reader ===\n";
 	const gal::ini::IniReader ini{"test.ini"};
 	ini.print(std::cout);
+
+	std::cout << "\n\n";
+
+	std::cout << "=== unordered reader ===\n";
+	const gal::ini::IniReaderWithComment ini_with_comment{"test.ini"};
+	ini_with_comment.print(std::cout);
 }

@@ -28,42 +28,25 @@ namespace
 		}
 	}
 
-	template<typename Impl, typename Ini, typename Encoding>
-	class ParseState
+	template<typename Return, typename... Functions>
+	[[nodiscard]] constexpr auto callback(Functions&&... functions)
 	{
-		using impl_type = Impl;
+		return lexy::bind(
+				lexy::callback<Return>(std::forward<Functions>(functions)...),
+				// out parse state
+				lexy::parse_state,
+				// parsed values
+				lexy::values);
+	}
 
-		[[nodiscard]] constexpr auto rep() const -> const impl_type&
-		{
-			return static_cast<const impl_type&>(*this);
-		}
+	using default_encoding = lexy::utf8_encoding;
 
-		[[nodiscard]] constexpr auto rep() -> impl_type&
-		{
-			return static_cast<impl_type&>(*this);
-		}
-
+	class Buffer
+	{
 	public:
-		template<typename Return, typename... Functions>
-		[[nodiscard]] constexpr static auto callback(Functions&&... functions)
-		{
-			return lexy::bind(
-					lexy::callback<Return>(std::forward<Functions>(functions)...),
-					// out parse state
-					lexy::parse_state,
-					// parsed values
-					lexy::values);
-		}
-
-		using encoding	  = Encoding;
+		using encoding	  = default_encoding;
 		using buffer_type = lexy::buffer<encoding>;
 		using char_type	  = buffer_type::char_type;
-
-		static_assert(std::is_same_v<encoding, typename buffer_type::encoding>);
-
-		using ini_type	  = Ini;
-		using writer_type = ini_type::writer_type;
-		using group_type  = ini_type::group_type;
 
 	private:
 		const buffer_type&						 buffer_;
@@ -71,11 +54,8 @@ namespace
 
 		ini::filename_view_type					 filename_;
 
-	protected:
-		ini_type&					 ini_;
-		std::unique_ptr<writer_type> writer_;
-
-		auto						 report_duplicate_declaration(const char_type* position, const ini::string_view_type identifier, const ini::string_view_type category) const -> void
+	public:
+		auto report_duplicate_declaration(const char_type* position, const ini::string_view_type identifier, const std::string_view category) const -> void
 		{
 			const auto						  location = lexy::get_input_location(buffer_, position, buffer_anchor_);
 
@@ -83,10 +63,10 @@ namespace
 			const lexy_ext::diagnostic_writer writer{buffer_, {.flags = lexy::visualize_fancy}};
 
 			(void)writer.write_message(out,
-									   lexy_ext::diagnostic_kind::error,
+									   lexy_ext::diagnostic_kind::warning,
 									   [&](lexy::cfile_output_iterator, lexy::visualization_options)
 									   {
-										   (void)std::fprintf(stderr, "duplicate %s declaration named '%s'", to_char_string(category).data(), to_char_string(identifier).data());
+										   (void)std::fprintf(stderr, "duplicate %s declaration named '%s'", category.data(), to_char_string(identifier).data());
 										   return out;
 									   });
 
@@ -105,91 +85,116 @@ namespace
 					});
 		}
 
-		auto debug_print_variable(const char_type* position, const ini::string_view_type key, const ini::string_view_type value) const -> void
-		{
-			const auto						  location = lexy::get_input_location(buffer_, position, buffer_anchor_);
-
-			const auto						  out	   = lexy::cfile_output_iterator{stderr};
-			const lexy_ext::diagnostic_writer writer{buffer_, {.flags = lexy::visualize_fancy}};
-
-			(void)writer.write_message(out,
-									   lexy_ext::diagnostic_kind::info,
-									   [&](lexy::cfile_output_iterator, lexy::visualization_options)
-									   {
-										   (void)std::fprintf(stderr, "[%s]: %s = %s", to_char_string(writer_->name()).data(), to_char_string(key).data(), to_char_string(value).data());
-										   return out;
-									   });
-
-			if (!filename_.empty()) { (void)writer.write_path(out, filename_.data()); }
-
-			(void)writer.write_empty_annotation(out);
-			(void)writer.write_annotation(
-					out,
-					lexy_ext::annotation_kind::primary,
-					location,
-					key.size() + value.size(),
-					[&](lexy::cfile_output_iterator, lexy::visualization_options)
-					{
-						(void)std::fprintf(stderr, "at here.");
-						return out;
-					});
-		}
-
-	public:
-		ParseState(
+		Buffer(
 				const ini::filename_view_type filename,
-				const buffer_type&			  buffer,
-				ini_type&					  ini)
+				const buffer_type&			  buffer)
 			: buffer_{buffer},
 			  buffer_anchor_{buffer_},
-			  filename_{filename},
+			  filename_{filename} {}
+	};
+
+	template<typename Ini>
+	class TrivialParseState
+	{
+	public:
+		using ini_type	  = Ini;
+		using writer_type = ini_type::writer_type;
+
+	private:
+		Buffer						 buffer_;
+
+		ini_type&					 ini_;
+		std::unique_ptr<writer_type> writer_;
+
+	public:
+		TrivialParseState(
+				const ini::filename_view_type filename,
+				const Buffer::buffer_type&	  buffer,
+				ini_type&					  ini)
+			: buffer_{filename, buffer},
 			  ini_{ini},
 			  writer_{nullptr} {}
 
-		auto begin_group(const char_type* position, ini::string_type&& group_name) -> void
+		auto begin_group(const Buffer::char_type* position, ini::string_type&& group_name) -> void
 		{
-			rep().do_begin_group(position, std::move(group_name));
-		}
+			writer_ = std::make_unique<writer_type>(ini_.write(std::move(group_name)));
 
-		auto value(const char_type* position, ini::string_type&& key, ini::string_type&& value) -> void
-		{
-			rep().do_value(position, std::move(key), std::move(value));
-		}
-	};
-
-	template<typename Encoding>
-	class UnorderedParseState final : public ParseState<UnorderedParseState<Encoding>, ini::impl::IniReader, Encoding>
-	{
-		using parent = ParseState<UnorderedParseState<Encoding>, ini::impl::IniReader, Encoding>;
-		friend parent;
-
-	public:
-		using ParseState<UnorderedParseState<Encoding>, ini::impl::IniReader, Encoding>::ParseState;
-
-	private:
-		auto do_begin_group(const typename parent::char_type* position, ini::string_type&& group_name) -> void
-		{
-			// [[maybe_unused]] const auto location = lexy::get_input_location(buffer_, position, buffer_anchor_);
-
-			this->writer_ = std::make_unique<typename parent::writer_type>(this->ini_.write(std::move(group_name)));
-
-
-			if (!this->writer_->empty())
+			if (!writer_->empty())
 			{
 				// If we get here, it means that a group with the same name already exists before, then this 'group_name' will not be consumed because of move.
-				this->report_duplicate_declaration(position, group_name, "group");
+				buffer_.report_duplicate_declaration(position, writer_->name(), "group");
 			}
 		}
 
-		auto do_value(const typename parent::char_type* position, ini::string_type&& key, ini::string_type&& value) -> void
+		auto value(const Buffer::char_type* position, ini::string_type&& key, ini::string_type&& value) -> void
 		{
-			// [[maybe_unused]] const auto location = lexy::get_input_location(buffer_, position, buffer_anchor_);
-
 			// Our parse ensures the writer is valid
-			if (!this->writer_->try_insert(std::move(key), std::move(value)))
+			const auto& [inserted, result_key, result_value] = writer_->try_insert(std::move(key), std::move(value));
+			if (!inserted)
 			{
 				// If we get here, it means that a key with the same name already exists before, then this 'key' will not be consumed because of move.
-				this->report_duplicate_declaration(position, key, "variable");
+				buffer_.report_duplicate_declaration(position, result_key, "variable");
+			}
+		}
+	};
+
+	template<typename Ini>
+	class TrivialParseStateWithComment
+	{
+	public:
+		using ini_type	  = Ini;
+		using writer_type = ini_type::writer_type;
+
+	private:
+		Buffer						 buffer_;
+
+		ini_type&					 ini_;
+		std::unique_ptr<writer_type> writer_;
+
+		ini::comment_type			 comment_;
+
+	public:
+		TrivialParseStateWithComment(
+				const ini::filename_view_type filename,
+				const Buffer::buffer_type&	  buffer,
+				ini_type&					  ini)
+			: buffer_{filename, buffer},
+			  ini_{ini},
+			  writer_{nullptr},
+			  comment_{'\0', {}} {}
+
+		auto comment(ini::comment_type&& comment) -> void
+		{
+			comment_ = std::move(comment);
+		}
+
+		auto begin_group(const Buffer::char_type* position, ini::string_type&& group_name, ini::comment_type&& inline_comment = {}) -> void
+		{
+			writer_ = std::make_unique<writer_type>(ini_.write(std::move(group_name)));
+
+			if (!writer_->empty())
+			{
+				buffer_.report_duplicate_declaration(position, writer_->name(), "group");
+			}
+
+			writer_->comment(std::exchange(comment_, {}));
+			writer_->inline_comment(std::move(inline_comment));
+		}
+
+		auto value(const Buffer::char_type* position, ini::string_type&& key, ini::string_type&& value, ini::comment_type&& inline_comment = {}) -> void
+		{
+			// Our parse ensures the writer is valid
+			const auto& [inserted,
+						 result_comment,
+						 result_key,
+						 result_value,
+						 result_inline_comment] = writer_->try_insert(std::move(key),
+																	  std::move(value),
+																	  std::exchange(comment_, {}),
+																	  std::move(inline_comment));
+			if (!inserted)
+			{
+				buffer_.report_duplicate_declaration(position, result_key, "variable");
 			}
 		}
 	};
@@ -198,86 +203,183 @@ namespace
 	{
 		namespace dsl = lexy::dsl;
 
-		template<typename ParseState>
-		struct identifier
+		struct group_identifier
 		{
+			[[nodiscard]] consteval static auto name() noexcept -> const char*
+			{
+				return "[group name]";
+			}
+
 			constexpr static auto rule =
 					dsl::identifier(
-							// begin with alpha/digit/underscore
-							dsl::ascii::alpha_digit_underscore,
-							// continue with alpha/digit/underscore
-							dsl::ascii::alpha_digit_underscore);
+							// begin with printable
+							dsl::unicode::print,
+							// continue with printable, but excluding '\r', '\n', '\r\n' and ']'
+							dsl::unicode::print - dsl::unicode::newline - dsl::square_bracketed.close());
 
-			constexpr static auto value = lexy::as_string<ini::string_type, typename ParseState::encoding>;
+			constexpr static auto value = lexy::as_string<ini::string_type, default_encoding>;
 		};
 
-		template<typename ParseState>
-		struct variable
+		struct identifier
 		{
-			// struct invalid_char
-			// {
-			// 	static LEXY_CONSTEVAL auto name() { return "invalid character in string literal"; }
-			// };
-			//
-			// // A mapping of the simple escape sequences to their replacement values.
-			// static constexpr auto escaped_symbols = lexy::symbol_table<char>//
-			// 												.map<'"'>('"')
-			// 												.map<'\\'>('\\')
-			// 												.map<'/'>('/')
-			// 												.map<'b'>('\b')
-			// 												.map<'f'>('\f')
-			// 												.map<'n'>('\n')
-			// 												.map<'r'>('\r')
-			// 												.map<'t'>('\t');
-			//
-			// struct code_point_id
-			// {
-			// 	// We parse the integer value of a UTF-16 code unit.
-			// 	static constexpr auto rule	= LEXY_LIT("u") >> dsl::code_unit_id<lexy::utf16_encoding, 4>;
-			// 	// And convert it into a code point, which might be a surrogate.
-			// 	static constexpr auto value = lexy::construct<lexy::code_point>;
-			// };
-			//
-			// static constexpr auto rule = []
-			// {
-			// 	// Everything is allowed inside a string except for control characters.
-			// 	auto code_point = (-dsl::unicode::control).error<invalid_char>;
-			//
-			// 	// Escape sequences start with a backlash and either map one of the symbols,
-			// 	// or a Unicode code point.
-			// 	auto escape		= dsl::backslash_escape.symbol<escaped_symbols>().rule(dsl::p<code_point_id>);
-			//
-			// 	// String of code_point with specified escape sequences, surrounded by ".
-			// 	// We abort string parsing if we see a newline to handle missing closing ".
-			// 	return dsl::quoted.limit(dsl::ascii::newline)(code_point, escape);
-			// }();
+			[[nodiscard]] consteval static auto name() noexcept -> const char*
+			{
+				return "[identifier]";
+			}
+
+			constexpr static auto rule =
+					dsl::identifier(
+							// begin with printable
+							dsl::unicode::print,
+							// continue with printable, but excluding '\r', '\n', '\r\n', whitespace and '='
+							dsl::unicode::print -
+									dsl::unicode::newline -
+									dsl::unicode::blank -
+									dsl::equal_sign);
+
+			constexpr static auto value = lexy::as_string<ini::string_type, default_encoding>;
+		};
+
+		struct comment_context
+		{
+			[[nodiscard]] consteval static auto name() noexcept -> const char*
+			{
+				return "[comment context]";
+			}
 
 			constexpr static auto rule =
 					dsl::identifier(
 							// begin with printable
 							dsl::unicode::print,
 							// continue with printable, but excluding '\r', '\n' and '\r\n'
+							// todo: multi-line comment
 							dsl::unicode::print - dsl::unicode::newline);
 
-			constexpr static auto value = lexy::as_string<ini::string_type, typename ParseState::encoding>;
+			constexpr static auto value = lexy::as_string<ini::string_type, default_encoding>;
 		};
+
+		template<typename ParseState, char Indication>
+		struct comment
+		{
+			[[nodiscard]] consteval static auto name() noexcept -> const char*
+			{
+				return "[comment]";
+			}
+
+			constexpr static char indication = Indication;
+
+			constexpr static auto rule =
+					// begin with hash_sign
+					dsl::lit_c<indication>
+					//
+					>>
+					dsl::p<comment_context>;
+
+			constexpr static auto value = callback<void>(
+					[](ParseState& state, ini::string_type&& context) -> void
+					{
+						state.comment({indication, std::move(context)});
+					});
+		};
+
+		template<typename ParseState, char Indication>
+		struct comment_inline
+		{
+			[[nodiscard]] consteval static auto name() noexcept -> const char*
+			{
+				return "[inline comment]";
+			}
+
+			// constexpr static char indication = comment<ParseState, Indication>::indication;
+			constexpr static char indication = Indication;
+
+			// constexpr static auto rule		 = comment<ParseState, Indication>::rule;
+			constexpr static auto rule =
+					// begin with hash_sign
+					dsl::lit_c<indication>
+					//
+					>>
+					dsl::p<comment_context>;
+
+			constexpr static auto value = callback<ini::comment_type>(
+					[]([[maybe_unused]] ParseState& state, ini::string_type&& context) -> ini::comment_type
+					{
+						return {indication, std::move(context)};
+					});
+		};
+
+		template<typename ParseState>
+		using comment_hash_sign = comment<ParseState, '#'>;
+		template<typename ParseState>
+		using comment_semicolon = comment<ParseState, ';'>;
+
+		template<typename ParseState>
+		constexpr auto comment_production =
+				dsl::p<comment_hash_sign<ParseState>> |
+				dsl::p<comment_semicolon<ParseState>>;
+
+		template<typename ParseState>
+		using comment_inline_hash_sign = comment_inline<ParseState, '#'>;
+		template<typename ParseState>
+		using comment_inline_semicolon = comment_inline<ParseState, ';'>;
+
+		template<typename ParseState>
+		constexpr auto comment_inline_production =
+				dsl::p<comment_inline_hash_sign<ParseState>> |
+				dsl::p<comment_inline_semicolon<ParseState>>;
 
 		// identifier = [variable]
 		template<typename ParseState>
 		struct variable_declaration
 		{
+			[[nodiscard]] consteval static auto name() noexcept -> const char*
+			{
+				return "[kv pair declaration]";
+			}
+
 			constexpr static auto rule =
 					dsl::position +
-					dsl::p<identifier<ParseState>> +
+					dsl::p<identifier> +
 					dsl::equal_sign +
-					dsl::opt(dsl::p<variable<ParseState>>);
+					dsl::opt(dsl::no_whitespace(dsl::p<identifier>));
 
-			constexpr static auto value = ParseState::template callback<void>(
+			constexpr static auto value = callback<void>(
 					// identifier = variable
-					[](ParseState& state, const typename ParseState::char_type* position, ini::string_type&& key, ini::string_type&& value) -> void
+					[](ParseState& state, const Buffer::char_type* position, ini::string_type&& key, ini::string_type&& value) -> void
 					{ state.value(position, std::move(key), std::move(value)); },
 					// identifier =
-					[](ParseState& state, const typename ParseState::char_type* position, ini::string_type&& key, lexy::nullopt) -> void
+					[](ParseState& state, const Buffer::char_type* position, ini::string_type&& key, lexy::nullopt) -> void
+					{ state.value(position, std::move(key), ini::string_type{}); });
+		};
+
+		template<typename ParseState>
+		struct variable_declaration_with_comment
+		{
+			[[nodiscard]] consteval static auto name() noexcept -> const char*
+			{
+				return "[kv pair declaration with comment]";
+			}
+
+			constexpr static auto rule =
+					dsl::if_(comment_production<ParseState>) +
+					dsl::position +
+					dsl::p<identifier> +
+					dsl::equal_sign +
+					dsl::opt(dsl::no_whitespace(dsl::p<identifier>)) +
+					dsl::opt(comment_inline_production<ParseState>);
+
+			constexpr static auto value = callback<void>(
+					// [identifier] = [variable] [comment]
+					[](ParseState& state, const Buffer::char_type* position, ini::string_type&& key, ini::string_type&& value, ini::comment_type&& comment) -> void
+					{ state.value(position, std::move(key), std::move(value), std::move(comment)); },
+					// [identifier] = [] [variable]
+					[](ParseState& state, const Buffer::char_type* position, ini::string_type&& key, ini::string_type&& value, lexy::nullopt) -> void
+					{ state.value(position, std::move(key), std::move(value)); },
+					// [identifier] = [] [comment]
+					[](ParseState& state, const Buffer::char_type* position, ini::string_type&& key, lexy::nullopt, ini::comment_type&& comment) -> void
+					{ state.value(position, std::move(key), ini::string_type{}, std::move(comment)); },
+					// [identifier] = [] []
+					[](ParseState& state, const Buffer::char_type* position, ini::string_type&& key, lexy::nullopt, lexy::nullopt) -> void
 					{ state.value(position, std::move(key), ini::string_type{}); });
 		};
 
@@ -285,34 +387,75 @@ namespace
 		template<typename ParseState>
 		struct group_declaration
 		{
+			[[nodiscard]] consteval static auto name() noexcept -> const char*
+			{
+				return "[group declaration]";
+			}
+
 			struct header : lexy::transparent_production
 			{
 				constexpr static auto rule =
-						// [
-						dsl::square_bracketed.open() >>
-						(dsl::position +
-						 // group name
-						 dsl::p<identifier<ParseState>> +
-						 // ]
-						 dsl::square_bracketed.close());
+						dsl::position +
+						// group name
+						dsl::p<group_identifier> +
+						// ]
+						dsl::square_bracketed.close();
 
-				constexpr static auto value = ParseState::template callback<void>(
-						[](ParseState& state, const typename ParseState::char_type* position, ini::string_type&& group_name) -> void
+				constexpr static auto value = callback<void>(
+						[](ParseState& state, const Buffer::char_type* position, ini::string_type&& group_name) -> void
 						{ state.begin_group(position, std::move(group_name)); });
 			};
 
+			// end with 'eof' or next '[' (group begin)
 			constexpr static auto rule =
-					dsl::p<header> +
-					// dsl::unicode::newline +
-					// variables
-					// dsl::recurse<variable_declaration>;
-					// dsl::recurse_branch<variable_declaration>;
+					// [
+					dsl::square_bracketed.open() >>
+					(dsl::p<header> +
+					 dsl::terminator(
+							 dsl::eof |
+							 dsl::peek(dsl::square_bracketed.open()))
+							 .opt_list(dsl::p<variable_declaration<ParseState>>));
 
-					// dsl::list(dsl::p<variable_declaration>, dsl::sep(dsl::unicode::newline));
-					// dsl::list(dsl::p<variable_declaration>);
+			constexpr static auto value = lexy::forward<void>;
+		};
 
-					// dsl::terminator(dsl::eof | dsl::square_bracketed.open()).opt_list(dsl::p<variable_declaration>, dsl::sep(dsl::unicode::newline));
-					dsl::terminator(dsl::eof | dsl::peek(dsl::square_bracketed.open())).opt_list(dsl::p<variable_declaration<ParseState>>);
+		template<typename ParseState>
+		struct group_declaration_with_comment
+		{
+			[[nodiscard]] consteval static auto name() noexcept -> const char*
+			{
+				return "[group declaration with comment]";
+			}
+
+			struct header : lexy::transparent_production
+			{
+				constexpr static auto rule =
+						dsl::position +
+						// group name
+						dsl::p<group_identifier> +
+						// ]
+						dsl::square_bracketed.close() +
+						dsl::opt(comment_inline_production<ParseState>);
+
+				constexpr static auto value = callback<void>(
+						// [group_name] [comment]
+						[](ParseState& state, const Buffer::char_type* position, ini::string_type&& group_name, ini::comment_type&& comment) -> void
+						{ state.begin_group(position, std::move(group_name), std::move(comment)); },
+						// [group_name] []
+						[](ParseState& state, const Buffer::char_type* position, ini::string_type&& group_name, lexy::nullopt) -> void
+						{ state.begin_group(position, std::move(group_name)); });
+			};
+
+			// end with 'eof' or next '[' (group begin)
+			constexpr static auto rule =
+					dsl::if_(comment_production<ParseState>) +
+					// [
+					(dsl::square_bracketed.open() >>
+					 (dsl::p<header> +
+					  dsl::terminator(
+							  dsl::eof |
+							  dsl::peek(dsl::square_bracketed.open()))
+							  .opt_list(dsl::p<variable_declaration_with_comment<ParseState>>)));
 
 			constexpr static auto value = lexy::forward<void>;
 		};
@@ -320,15 +463,40 @@ namespace
 		template<typename ParseState>
 		struct file
 		{
+			[[nodiscard]] consteval static auto name() noexcept -> const char*
+			{
+				return "[file context]";
+			}
+
 			constexpr static auto whitespace =
 					// space
 					dsl::ascii::blank |
 					// The newline character is treated as a whitespace here, allowing us to skip the newline character, but this also leads to our above branching rules can no longer rely on the newline character.
 					dsl::unicode::newline |
-					// comment
-					dsl::hash_sign >> dsl::until(dsl::newline);
+					// ignore comment
+					dsl::hash_sign >> dsl::until(dsl::newline) |
+					dsl::semicolon >> dsl::until(dsl::newline);
 
 			constexpr static auto rule	= dsl::terminator(dsl::eof).opt_list(dsl::p<group_declaration<ParseState>>);
+
+			constexpr static auto value = lexy::forward<void>;
+		};
+
+		template<typename ParseState>
+		struct file_with_comment
+		{
+			[[nodiscard]] consteval static auto name() noexcept -> const char*
+			{
+				return "[file context with comment]";
+			}
+
+			constexpr static auto whitespace =
+					// space
+					dsl::ascii::blank |
+					// The newline character is treated as a whitespace here, allowing us to skip the newline character, but this also leads to our above branching rules can no longer rely on the newline character.
+					dsl::unicode::newline;
+
+			constexpr static auto rule	= dsl::terminator(dsl::eof).opt_list(dsl::p<group_declaration_with_comment<ParseState>>);
 
 			constexpr static auto value = lexy::forward<void>;
 		};
@@ -339,11 +507,16 @@ namespace gal::ini::impl
 {
 	namespace detail
 	{
-		auto GroupAccessor<GroupProperty::READ_MODIFY>::insert_or_assign(node_type&& node) -> bool
+		auto GroupAccessor<GroupProperty::READ_MODIFY>::insert_or_assign(node_type&& node) -> result_type
 		{
-			auto&& [key, value]		  = std::move(node);
-			const auto [it, inserted] = group_.insert_or_assign(std::move(key), std::move(value));
-			return inserted;
+			auto&& [key, value] = std::move(node);
+			return insert_or_assign(std::move(key), std::move(value));
+		}
+
+		auto GroupAccessor<GroupProperty::READ_MODIFY_WITH_COMMENT>::insert_or_assign(node_type&& node) -> result_type
+		{
+			auto&& [comment, key, value, inline_comment] = std::move(node);
+			return insert_or_assign(std::move(key), std::move(value), std::move(comment), std::move(inline_comment));
 		}
 
 		auto GroupAccessor<GroupProperty::READ_ORDERED>::get_it(group_type& group, string_view_type key) -> group_type::iterator
@@ -641,12 +814,42 @@ namespace gal::ini::impl
 	IniReader::IniReader(filename_view_type filename)
 	{
 		// todo: encoding?
-		auto file = lexy::read_file<lexy::utf8_encoding>(filename.data());
+		auto file = lexy::read_file<default_encoding>(filename.data());
 
 		if (file)
 		{
-			UnorderedParseState<lexy::utf8_encoding> state{filename, file.buffer(), *this};
-			lexy::parse<grammar::file<std::decay_t<decltype(state)>>>(file.buffer(), state, lexy_ext::report_error.opts({.flags = lexy::visualize_fancy}).path(filename.data()));
+			TrivialParseState<IniReader> state{filename, file.buffer(), *this};
+
+			if (const auto result =
+						lexy::parse<grammar::file<std::decay_t<decltype(state)>>>(
+								file.buffer(),
+								state,
+								lexy_ext::report_error.opts({.flags = lexy::visualize_fancy}).path(filename.data()));
+				!result.has_value())
+			{
+				// todo: error ?
+			}
+		}
+	}
+
+	IniReaderWithComment::IniReaderWithComment(filename_view_type filename)
+	{
+		// todo: encoding?
+		auto file = lexy::read_file<default_encoding>(filename.data());
+
+		if (file)
+		{
+			TrivialParseStateWithComment<IniReaderWithComment> state{filename, file.buffer(), *this};
+
+			if (const auto result =
+						lexy::parse<grammar::file_with_comment<std::decay_t<decltype(state)>>>(
+								file.buffer(),
+								state,
+								lexy_ext::report_error.opts({.flags = lexy::visualize_fancy}).path(filename.data()));
+				!result.has_value())
+			{
+				// todo: error ?
+			}
 		}
 	}
 }// namespace gal::ini::impl
