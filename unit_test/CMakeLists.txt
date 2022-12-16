@@ -22,6 +22,8 @@ target_compile_definitions(
 	PUBLIC
 
 	BOOST_UT_DISABLE_MODULE
+	TEST_INI_READER_FILE_PATH="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test_ini_reader.ini"
+	TEST_INI_READER_WITH_COMMENT_FILE_PATH="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test_ini_reader_with_comment.ini"
 )
 
 set_compile_options_private(${PROJECT_NAME})
@@ -34,7 +36,8 @@ CPM_link_libraries_LINK(${PROJECT_NAME})
 target_link_libraries(
 		${PROJECT_NAME}
 		PRIVATE
-		gal::ini-shared
+#		gal::ini-shared
+		gal::ini-static
 )
 
 # cmake try to find 'bin\CMakeTemplateProject-impl-shared.lib' but it not exist if did not exported any symbol...
