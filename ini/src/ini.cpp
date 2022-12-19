@@ -69,7 +69,7 @@ namespace
 									   lexy_ext::diagnostic_kind::warning,
 									   [&](lexy::cfile_output_iterator, lexy::visualization_options)
 									   {
-										   (void)std::fprintf(stderr, "duplicate %s declaration named '%s'", category.data(), to_char_string(identifier).data());
+										   (void)std::fprintf(stderr, "duplicate %s declaration named '%s', ignore it...", category.data(), to_char_string(identifier).data());
 										   return out;
 									   });
 
@@ -357,14 +357,21 @@ namespace
 				return "[key]";
 			}
 
+			struct invalid_key
+			{
+				constexpr static auto name = "a valid key required here";
+			};
+
 			constexpr static auto rule = []
 			{
-				// begin with not blank
-				constexpr auto begin_with_not_blank	   = dsl::unicode::print - dsl::unicode::blank;
+				// begin with not '\r', '\n', '\r\n', whitespace or '='
+				constexpr auto begin_with_not_blank	   = dsl::unicode::print - dsl::unicode::newline - dsl::unicode::blank - dsl::equal_sign;
 				// continue with printable, but excluding '\r', '\n', '\r\n', whitespace and '='
 				constexpr auto continue_with_printable = dsl::unicode::print - dsl::unicode::newline - dsl::unicode::blank - dsl::equal_sign;
 
-				return dsl::peek(begin_with_not_blank) >> dsl::identifier(begin_with_not_blank, continue_with_printable);
+				return dsl::peek(begin_with_not_blank) >> dsl::identifier(begin_with_not_blank, continue_with_printable) |
+					   // This error can make the line parsing fail immediately when the [key] cannot be parsed, and then skip this line (instead of trying to make other possible matches).
+					   dsl::error<invalid_key>;
 			}();
 
 			constexpr static auto value = lexy::as_string<ini::string_type, default_encoding>;
@@ -379,8 +386,8 @@ namespace
 
 			constexpr static auto rule = []
 			{
-				// begin with not blank
-				constexpr auto begin_with_not_blank	   = dsl::unicode::print - dsl::unicode::blank;
+				// begin with not '\r', '\n', '\r\n', whitespace or '='
+				constexpr auto begin_with_not_blank	   = dsl::unicode::print - dsl::unicode::newline - dsl::unicode::blank - dsl::equal_sign;
 				// continue with printable, but excluding '\r', '\n', '\r\n', whitespace and '='
 				constexpr auto continue_with_printable = dsl::unicode::print - dsl::unicode::newline - dsl::unicode::blank - dsl::equal_sign;
 
@@ -439,22 +446,43 @@ namespace
 			}
 
 			constexpr static auto rule =
+					LEXY_DEBUG("parse variable_declaration begin") +
+					dsl::position +
+					dsl::p<variable_key> +
+					dsl::equal_sign +
+					dsl::opt(dsl::p<variable_value>) +
+					dsl::opt(comment_inline_production<ParseState, CommentRequired>) +
+					LEXY_DEBUG("parse variable_declaration end");
+
+			constexpr static auto value = value_generator<ParseState, CommentRequired>::value;
+		};
+
+		template<typename ParseState, bool CommentRequired>
+		struct variable_or_comment
+		{
+			[[nodiscard]] consteval static auto name() noexcept -> const char*
+			{
+				return "[variable or comment]";
+			}
+
+			constexpr static auto rule =
 					// ignore blank line
 					(dsl::peek(dsl::newline | dsl::unicode::blank) >>
 					 (LEXY_DEBUG("ignore empty line") +
 					  dsl::until(dsl::newline).or_eof())) |
+					// comment
+					// todo: sign?
+					(dsl::peek(
+							 dsl::lit_c<comment_hash_sign<ParseState, CommentRequired>::indication> |
+							 dsl::lit_c<comment_semicolon<ParseState, CommentRequired>::indication>) >>
+					 comment_production<ParseState, CommentRequired>) |
+					// variable
 					(dsl::else_ >>
-					 (LEXY_DEBUG("parse variable_declaration begin") +
-					  dsl::if_(comment_production<ParseState, CommentRequired>) +
-					  dsl::position +
-					  dsl::p<variable_key> +
-					  dsl::equal_sign +
-					  dsl::opt(dsl::p<variable_value>) +
-					  dsl::opt(comment_inline_production<ParseState, CommentRequired>) +
-					  LEXY_DEBUG("parse variable_declaration end") +
-					  dsl::until(dsl::newline)));
+					 (dsl::p<variable_declaration<ParseState, CommentRequired>> +
+					  // a newline required
+					  dsl::newline));
 
-			constexpr static auto value = value_generator<ParseState, CommentRequired>::value;
+			constexpr static auto value = lexy::forward<void>;
 		};
 
 		template<typename ParseState, bool CommentRequired>
@@ -521,7 +549,12 @@ namespace
 					  dsl::terminator(
 							  dsl::eof |
 							  dsl::peek(dsl::square_bracketed.open()))
-							  .opt_list(dsl::try_(dsl::p<variable_declaration<ParseState, CommentRequired>>)) +
+							  .opt_list(
+									  dsl::try_(
+											  // dsl::p<variable_declaration<ParseState, CommentRequired>>,
+											  dsl::p<variable_or_comment<ParseState, CommentRequired>>,
+											  // ignore this line if an error raised
+											  dsl::until(dsl::newline))) +
 					  LEXY_DEBUG("parse group properties end")));
 
 			constexpr static auto value = lexy::forward<void>;
