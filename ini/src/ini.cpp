@@ -3,6 +3,7 @@
 #include <fstream>
 #include <ini/ini.hpp>
 #include <lexy/action/parse.hpp>
+#include <lexy/action/trace.hpp>
 #include <lexy/callback.hpp>
 #include <lexy/dsl.hpp>
 #include <lexy/input/file.hpp>
@@ -10,6 +11,8 @@
 #include <lexy_ext/report_error.hpp>
 #include <memory>
 #include <ranges>
+
+#define GAL_INI_TRACE_PARSE
 
 namespace
 {
@@ -203,43 +206,6 @@ namespace
 	{
 		namespace dsl = lexy::dsl;
 
-		struct group_identifier
-		{
-			[[nodiscard]] consteval static auto name() noexcept -> const char*
-			{
-				return "[group name]";
-			}
-
-			constexpr static auto rule =
-					dsl::identifier(
-							// begin with printable
-							dsl::unicode::print,
-							// continue with printable, but excluding '\r', '\n', '\r\n' and ']'
-							dsl::unicode::print - dsl::unicode::newline - dsl::square_bracketed.close());
-
-			constexpr static auto value = lexy::as_string<ini::string_type, default_encoding>;
-		};
-
-		struct identifier
-		{
-			[[nodiscard]] consteval static auto name() noexcept -> const char*
-			{
-				return "[identifier]";
-			}
-
-			constexpr static auto rule =
-					dsl::identifier(
-							// begin with printable
-							dsl::unicode::print,
-							// continue with printable, but excluding '\r', '\n', '\r\n', whitespace and '='
-							dsl::unicode::print -
-									dsl::unicode::newline -
-									dsl::unicode::blank -
-									dsl::equal_sign);
-
-			constexpr static auto value = lexy::as_string<ini::string_type, default_encoding>;
-		};
-
 		struct comment_context
 		{
 			[[nodiscard]] consteval static auto name() noexcept -> const char*
@@ -273,7 +239,10 @@ namespace
 					dsl::lit_c<indication>
 					//
 					>>
-					dsl::p<comment_context>;
+					(LEXY_DEBUG("parse comment begin") +
+					 dsl::p<comment_context> +
+					 LEXY_DEBUG("parse comment end") +
+					 dsl::newline);
 
 			constexpr static auto value = callback<void>(
 					[](ParseState& state, ini::string_type&& context) -> void
@@ -299,7 +268,9 @@ namespace
 					dsl::lit_c<indication>
 					//
 					>>
-					dsl::p<comment_context>;
+					(LEXY_DEBUG("parse inline_comment begin") +
+					 dsl::p<comment_context> +
+					 LEXY_DEBUG("parse inline_comment end"));
 
 			constexpr static auto value = callback<ini::comment_type>(
 					[]([[maybe_unused]] ParseState& state, ini::string_type&& context) -> ini::comment_type
@@ -328,6 +299,63 @@ namespace
 				dsl::p<comment_inline_hash_sign<ParseState>> |
 				dsl::p<comment_inline_semicolon<ParseState>>;
 
+		struct group_name
+		{
+			[[nodiscard]] consteval static auto name() noexcept -> const char*
+			{
+				return "[group name]";
+			}
+
+			constexpr static auto rule =
+					dsl::identifier(
+							// begin with printable
+							dsl::unicode::print,
+							// continue with printable, but excluding '\r', '\n', '\r\n' and ']'
+							dsl::unicode::print - dsl::unicode::newline - dsl::square_bracketed.close());
+
+			constexpr static auto value = lexy::as_string<ini::string_type, default_encoding>;
+		};
+
+		struct variable_key
+		{
+			[[nodiscard]] consteval static auto name() noexcept -> const char*
+			{
+				return "[key]";
+			}
+
+			constexpr static auto rule = []
+			{
+				// begin with not blank
+				constexpr auto begin_with_not_blank	   = dsl::unicode::print - dsl::unicode::blank;
+				// continue with printable, but excluding '\r', '\n', '\r\n', whitespace and '='
+				constexpr auto continue_with_printable = dsl::unicode::print - dsl::unicode::newline - dsl::unicode::blank - dsl::equal_sign;
+
+				return dsl::peek(begin_with_not_blank) >> dsl::identifier(begin_with_not_blank, continue_with_printable);
+			}();
+
+			constexpr static auto value = lexy::as_string<ini::string_type, default_encoding>;
+		};
+
+		struct variable_value
+		{
+			[[nodiscard]] consteval static auto name() noexcept -> const char*
+			{
+				return "[value]";
+			}
+
+			constexpr static auto rule = []
+			{
+				// begin with not blank
+				constexpr auto begin_with_not_blank	   = dsl::unicode::print - dsl::unicode::blank;
+				// continue with printable, but excluding '\r', '\n', '\r\n', whitespace and '='
+				constexpr auto continue_with_printable = dsl::unicode::print - dsl::unicode::newline - dsl::unicode::blank - dsl::equal_sign;
+
+				return dsl::peek(begin_with_not_blank) >> dsl::identifier(begin_with_not_blank, continue_with_printable);
+			}();
+
+			constexpr static auto value = lexy::as_string<ini::string_type, default_encoding>;
+		};
+
 		// identifier = [variable]
 		template<typename ParseState>
 		struct variable_declaration
@@ -338,12 +366,22 @@ namespace
 			}
 
 			constexpr static auto rule =
-					dsl::position +
-					dsl::p<identifier> +
-					dsl::equal_sign +
-					dsl::opt(dsl::no_whitespace(dsl::p<identifier>));
+					// ignore blank line
+					(dsl::peek(dsl::newline | dsl::unicode::blank) >>
+					 (LEXY_DEBUG("ignore empty line") +
+					  dsl::until(dsl::newline).or_eof())) |
+					(dsl::else_ >>
+					 (LEXY_DEBUG("parse variable_declaration begin") +
+					  dsl::position +
+					  dsl::p<variable_key> +
+					  dsl::equal_sign +
+					  dsl::opt(dsl::p<variable_value>) +
+					  LEXY_DEBUG("parse variable_declaration end") +
+					  dsl::until(dsl::newline)));
 
 			constexpr static auto value = callback<void>(
+					// blank line
+					[]([[maybe_unused]] ParseState& state) {},
 					// identifier = variable
 					[](ParseState& state, const Buffer::char_type* position, ini::string_type&& key, ini::string_type&& value) -> void
 					{ state.value(position, std::move(key), std::move(value)); },
@@ -361,14 +399,24 @@ namespace
 			}
 
 			constexpr static auto rule =
-					dsl::if_(comment_production<ParseState>) +
-					dsl::position +
-					dsl::p<identifier> +
-					dsl::equal_sign +
-					dsl::opt(dsl::no_whitespace(dsl::p<identifier>)) +
-					dsl::opt(comment_inline_production<ParseState>);
+					// ignore blank line
+					(dsl::peek(dsl::newline | dsl::unicode::blank) >>
+					 (LEXY_DEBUG("ignore empty line") +
+					  dsl::until(dsl::newline).or_eof())) |
+					(dsl::else_ >>
+					 (LEXY_DEBUG("parse variable_declaration_with_comment begin") +
+					  dsl::if_(comment_production<ParseState>) +
+					  dsl::position +
+					  dsl::p<variable_key> +
+					  dsl::equal_sign +
+					  dsl::opt(dsl::p<variable_value>) +
+					  dsl::opt(comment_inline_production<ParseState>) +
+					  LEXY_DEBUG("parse variable_declaration_with_comment end") +
+					  dsl::until(dsl::newline)));
 
 			constexpr static auto value = callback<void>(
+					// blank line
+					[]([[maybe_unused]] ParseState& state) {},
 					// [identifier] = [variable] [comment]
 					[](ParseState& state, const Buffer::char_type* position, ini::string_type&& key, ini::string_type&& value, ini::comment_type&& comment) -> void
 					{ state.value(position, std::move(key), std::move(value), std::move(comment)); },
@@ -394,12 +442,20 @@ namespace
 
 			struct header : lexy::transparent_production
 			{
+				[[nodiscard]] consteval static auto name() noexcept -> const char*
+				{
+					return "[group head]";
+				}
+
 				constexpr static auto rule =
+						LEXY_DEBUG("parse group_name begin") +
 						dsl::position +
 						// group name
-						dsl::p<group_identifier> +
+						dsl::p<group_name> +
+						LEXY_DEBUG("parse group_name end") +
 						// ]
-						dsl::square_bracketed.close();
+						dsl::square_bracketed.close() +
+						dsl::until(dsl::newline);
 
 				constexpr static auto value = callback<void>(
 						[](ParseState& state, const Buffer::char_type* position, ini::string_type&& group_name) -> void
@@ -411,10 +467,12 @@ namespace
 					// [
 					dsl::square_bracketed.open() >>
 					(dsl::p<header> +
+					 LEXY_DEBUG("parse group properties begin") +
 					 dsl::terminator(
 							 dsl::eof |
 							 dsl::peek(dsl::square_bracketed.open()))
-							 .opt_list(dsl::p<variable_declaration<ParseState>>));
+							 .opt_list(dsl::try_(dsl::p<variable_declaration<ParseState>>)) +
+					 LEXY_DEBUG("parse group properties end"));
 
 			constexpr static auto value = lexy::forward<void>;
 		};
@@ -429,13 +487,21 @@ namespace
 
 			struct header : lexy::transparent_production
 			{
+				[[nodiscard]] consteval static auto name() noexcept -> const char*
+				{
+					return "[group head with comment]";
+				}
+
 				constexpr static auto rule =
+						LEXY_DEBUG("parse group_name begin") +
 						dsl::position +
 						// group name
-						dsl::p<group_identifier> +
+						dsl::p<group_name> +
+						LEXY_DEBUG("parse group_name end") +
 						// ]
 						dsl::square_bracketed.close() +
-						dsl::opt(comment_inline_production<ParseState>);
+						dsl::opt(comment_inline_production<ParseState>) +
+						dsl::until(dsl::newline);
 
 				constexpr static auto value = callback<void>(
 						// [group_name] [comment]
@@ -452,10 +518,12 @@ namespace
 					// [
 					(dsl::square_bracketed.open() >>
 					 (dsl::p<header> +
+					  LEXY_DEBUG("parse group properties with comment begin") +
 					  dsl::terminator(
 							  dsl::eof |
 							  dsl::peek(dsl::square_bracketed.open()))
-							  .opt_list(dsl::p<variable_declaration_with_comment<ParseState>>)));
+							  .opt_list(dsl::try_(dsl::p<variable_declaration_with_comment<ParseState>>)) +
+					  LEXY_DEBUG("parse group properties with comment end")));
 
 			constexpr static auto value = lexy::forward<void>;
 		};
@@ -469,11 +537,9 @@ namespace
 			}
 
 			constexpr static auto whitespace =
-					// space
 					dsl::ascii::blank |
-					// The newline character is treated as a whitespace here, allowing us to skip the newline character, but this also leads to our above branching rules can no longer rely on the newline character.
-					dsl::unicode::newline |
 					// ignore comment
+					// todo: more comment format?
 					dsl::hash_sign >> dsl::until(dsl::newline) |
 					dsl::semicolon >> dsl::until(dsl::newline);
 
@@ -490,17 +556,42 @@ namespace
 				return "[file context with comment]";
 			}
 
-			constexpr static auto whitespace =
-					// space
-					dsl::ascii::blank |
-					// The newline character is treated as a whitespace here, allowing us to skip the newline character, but this also leads to our above branching rules can no longer rely on the newline character.
-					dsl::unicode::newline;
+			constexpr static auto whitespace = dsl::ascii::blank;
 
-			constexpr static auto rule	= dsl::terminator(dsl::eof).opt_list(dsl::p<group_declaration_with_comment<ParseState>>);
+			constexpr static auto rule		 = dsl::terminator(dsl::eof).opt_list(dsl::p<group_declaration_with_comment<ParseState>>);
 
-			constexpr static auto value = lexy::forward<void>;
+			constexpr static auto value		 = lexy::forward<void>;
 		};
 	}// namespace grammar
+
+	template<typename ParseState, template<typename> typename Production, typename Ini>
+	auto parse(ini::filename_view_type filename, Ini& ini)
+	{
+		// todo: encoding?
+		auto file = lexy::read_file<default_encoding>(filename.data());
+
+		if (file)
+		{
+			ParseState state{filename, file.buffer(), ini};
+
+			if (const auto result =
+						lexy::parse<Production<ParseState>>(
+								file.buffer(),
+								state,
+								lexy_ext::report_error.opts({.flags = lexy::visualize_fancy}).path(filename.data()));
+				!result.has_value())
+			{
+				// todo: error ?
+			}
+
+#ifdef GAL_INI_TRACE_PARSE
+			lexy::trace<Production<ParseState>>(
+					stderr,
+					file.buffer(),
+					{.flags = lexy::visualize_fancy});
+#endif
+		}
+	}
 }// namespace
 
 namespace gal::ini::impl
@@ -813,43 +904,11 @@ namespace gal::ini::impl
 
 	IniReader::IniReader(filename_view_type filename)
 	{
-		// todo: encoding?
-		auto file = lexy::read_file<default_encoding>(filename.data());
-
-		if (file)
-		{
-			TrivialParseState<IniReader> state{filename, file.buffer(), *this};
-
-			if (const auto result =
-						lexy::parse<grammar::file<std::decay_t<decltype(state)>>>(
-								file.buffer(),
-								state,
-								lexy_ext::report_error.opts({.flags = lexy::visualize_fancy}).path(filename.data()));
-				!result.has_value())
-			{
-				// todo: error ?
-			}
-		}
+		parse<TrivialParseState<IniReader>, grammar::file>(filename, *this);
 	}
 
 	IniReaderWithComment::IniReaderWithComment(filename_view_type filename)
 	{
-		// todo: encoding?
-		auto file = lexy::read_file<default_encoding>(filename.data());
-
-		if (file)
-		{
-			TrivialParseStateWithComment<IniReaderWithComment> state{filename, file.buffer(), *this};
-
-			if (const auto result =
-						lexy::parse<grammar::file_with_comment<std::decay_t<decltype(state)>>>(
-								file.buffer(),
-								state,
-								lexy_ext::report_error.opts({.flags = lexy::visualize_fancy}).path(filename.data()));
-				!result.has_value())
-			{
-				// todo: error ?
-			}
-		}
+		parse<TrivialParseStateWithComment<IniReaderWithComment>, grammar::file_with_comment>(filename, *this);
 	}
 }// namespace gal::ini::impl
