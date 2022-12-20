@@ -47,7 +47,7 @@ suite generate_file = []
 
 suite test_group = []
 {
-	IniReader reader{TEST_INI_READER_FILE_PATH};
+	IniParser reader{TEST_INI_READER_FILE_PATH};
 
 	"group_size"_test = [&]
 	{
