@@ -1,6 +1,5 @@
 #include <algorithm>
 #include <filesystem>
-#include <fstream>
 #include <ini/ini.hpp>
 #include <lexy/action/parse.hpp>
 #include <lexy/action/trace.hpp>
@@ -10,7 +9,6 @@
 #include <lexy/visualize.hpp>
 #include <lexy_ext/report_error.hpp>
 #include <memory>
-#include <ranges>
 
 //#define GAL_INI_TRACE_PARSE
 
@@ -49,7 +47,7 @@ namespace
 		const buffer_type&                       buffer_;
 		lexy::input_location_anchor<buffer_type> buffer_anchor_;
 
-		ini::filename_view_type filename_;
+		const ini::file_path_type& file_path_;
 
 	public:
 		auto report_duplicate_declaration(const char_type* position, const ini::string_view_type identifier, const std::string_view category) const -> void
@@ -67,7 +65,7 @@ namespace
 											return out;
 										});
 
-			if (!filename_.empty()) { (void)writer.write_path(out, filename_.data()); }
+			if (!file_path_.empty()) { (void)writer.write_path(out, file_path_.string().c_str()); }
 
 			(void)writer.write_empty_annotation(out);
 			(void)writer.write_annotation(
@@ -83,11 +81,11 @@ namespace
 		}
 
 		Buffer(
-				const ini::filename_view_type filename,
-				const buffer_type&            buffer)
+				const ini::file_path_type& file_path,
+				const buffer_type&         buffer)
 			: buffer_{buffer},
 			buffer_anchor_{buffer_},
-			filename_{filename} {}
+			file_path_{file_path} {}
 	};
 
 	template<typename Ini>
@@ -105,10 +103,9 @@ namespace
 
 	public:
 		ParseState(
-				const ini::filename_view_type filename,
-				const Buffer::buffer_type&    buffer,
-				ini_type&                     ini)
-			: buffer_{filename, buffer},
+				const Buffer::buffer_type& buffer,
+				ini_type&                  ini)
+			: buffer_{ini.file_path(), buffer},
 			ini_{ini},
 			writer_{nullptr} {}
 
@@ -152,10 +149,9 @@ namespace
 
 	public:
 		ParseStateWithComment(
-				const ini::filename_view_type filename,
-				const Buffer::buffer_type&    buffer,
-				ini_type&                     ini)
-			: buffer_{filename, buffer},
+				const Buffer::buffer_type& buffer,
+				ini_type&                  ini)
+			: buffer_{ini.file_path(), buffer},
 			ini_{ini},
 			writer_{nullptr},
 			comment_{'\0', {}} {}
@@ -488,7 +484,6 @@ namespace
 							dsl::peek(dsl::square_bracketed.open()))
 					.opt_list(
 							dsl::try_(
-									// dsl::p<variable_declaration<ParseState, CommentRequired>>,
 									dsl::p<variable_or_comment<ParseState, CommentRequired>>,
 									// ignore this line if an error raised
 									dsl::until(dsl::newline))) +
@@ -511,19 +506,21 @@ namespace
 	}// namespace grammar
 
 	template<typename ParseState, bool CommentRequired, typename Ini>
-	auto parse(ini::filename_view_type filename, Ini& ini)
+	auto parse(Ini& ini) -> void
 	{
-		// todo: encoding?
+		const auto& file_path   = ini.file_path();
+		const auto& file_string = file_path.string();
 
-		if (auto file = lexy::read_file<default_encoding>(filename.data()))
+		// todo: encoding?
+		if (auto file = lexy::read_file<default_encoding>(file_string.c_str()))
 		{
-			ParseState state{filename, file.buffer(), ini};
+			ParseState state{file.buffer(), ini};
 
 			if (const auto result =
 						lexy::parse<grammar::file<ParseState, CommentRequired>>(
 								file.buffer(),
 								state,
-								lexy_ext::report_error.opts({.flags = lexy::visualize_fancy}).path(filename.data()));
+								lexy_ext::report_error.opts({.flags = lexy::visualize_fancy}).path(file_string.c_str()));
 				!result.has_value())
 			{
 				// todo: error ?
@@ -541,9 +538,9 @@ namespace
 
 namespace gal::ini::impl
 {
-	IniParser::IniParser(filename_type&& filename)
-		: filename_{std::move(filename)} { parse<ParseState<IniParser>, false>(filename_, *this); }
+	IniParser::IniParser(file_path_type&& file_path)
+		: file_path_{std::move(file_path)} { parse<ParseState<IniParser>, false>(*this); }
 
-	IniParserWithComment::IniParserWithComment(filename_type&& filename)
-		: filename_{std::move(filename)} { parse<ParseStateWithComment<IniParserWithComment>, true>(filename_, *this); }
+	IniParserWithComment::IniParserWithComment(file_path_type&& file_path)
+		: file_path_{std::move(file_path)} { parse<ParseStateWithComment<IniParserWithComment>, true>(*this); }
 }// namespace gal::ini::impl

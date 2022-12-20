@@ -3,9 +3,10 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <filesystem>
 
 #ifndef GAL_INI_UNORDERED_MAP_TYPE
-	#include <unordered_map>
+#include <unordered_map>
 #endif
 
 #if defined(GAL_INI_COMPILER_MSVC) || defined(_MSC_VER)
@@ -27,8 +28,7 @@ namespace gal::ini
 	using char_type = string_type::value_type;
 	using string_view_type = std::basic_string_view<char_type>;
 
-	using filename_type = std::string;
-	using filename_view_type = std::string_view;
+	using file_path_type = std::filesystem::path;
 
 	struct comment_view_type
 	{
@@ -70,6 +70,53 @@ namespace gal::ini
 
 	template<typename Value>
 	using unordered_table_type = unordered_map_type<string_type, Value, string_hash_type>;
+
+	template<typename Char>
+	[[nodiscard]] consteval auto make_line_separator() noexcept
+	{
+		if constexpr (std::is_same_v<Char, wchar_t>)
+		{
+			#ifdef GAL_INI_COMPILER_MSVC
+			return L"\n";
+			#else
+			return L"\r\n";
+			#endif
+		}
+		else if constexpr (std::is_same_v<Char, char8_t>)
+		{
+			#ifdef GAL_INI_COMPILER_MSVC
+			return u8"\n";
+			#else
+			return u8"\r\n";
+			#endif
+		}
+		else if constexpr (std::is_same_v<Char, char16_t>)
+		{
+			#ifdef GAL_INI_COMPILER_MSVC
+			return u"\n";
+			#else
+			return u"\r\n";
+			#endif
+		}
+		else if constexpr (std::is_same_v<Char, char32_t>)
+		{
+			#ifdef GAL_INI_COMPILER_MSVC
+			return U"\n";
+			#else
+			return U"\r\n";
+			#endif
+		}
+		else
+		{
+			#ifdef GAL_INI_COMPILER_MSVC
+			return "\n";
+			#else
+			return "\r\n";
+			#endif
+		}
+	}
+
+	constexpr auto line_separator = make_line_separator<string_type::value_type>();
 }
 
 #include <ini/impl/ini_v3.hpp>

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ranges>
 
 namespace gal::ini::impl
 {
@@ -13,6 +14,9 @@ namespace gal::ini::impl
 
 		READ_ONLY_WITH_COMMENT,
 		READ_MODIFY_WITH_COMMENT,
+
+		WRITE_ONLY,
+		WRITE_ONLY_WITH_COMMENT,
 	};
 
 	template<typename Map>
@@ -66,51 +70,6 @@ namespace gal::ini::impl
 
 	namespace detail
 	{
-		template<typename Char>
-		[[nodiscard]] consteval auto line_separator() noexcept
-		{
-			if constexpr (std::is_same_v<Char, wchar_t>)
-			{
-				#ifdef GAL_INI_COMPILER_MSVC
-				return L"\n";
-				#else
-					return L"\r\n";
-				#endif
-			}
-			else if constexpr (std::is_same_v<Char, char8_t>)
-			{
-				#ifdef GAL_INI_COMPILER_MSVC
-				return u8"\n";
-				#else
-					return u8"\r\n";
-				#endif
-			}
-			else if constexpr (std::is_same_v<Char, char16_t>)
-			{
-				#ifdef GAL_INI_COMPILER_MSVC
-				return u"\n";
-				#else
-					return u"\r\n";
-				#endif
-			}
-			else if constexpr (std::is_same_v<Char, char32_t>)
-			{
-				#ifdef GAL_INI_COMPILER_MSVC
-				return U"\n";
-				#else
-					return U"\r\n";
-				#endif
-			}
-			else
-			{
-				#ifdef GAL_INI_COMPILER_MSVC
-				return "\n";
-				#else
-					return "\r\n";
-				#endif
-			}
-		}
-
 		template<GroupProperty>
 		class GroupAccessor;
 
@@ -601,13 +560,89 @@ namespace gal::ini::impl
 
 			auto extract(const string_view_type key) -> node_type { return node_type{map_transparent_modifier<group_type>::do_extract(propagate_rep().group, key)}; }
 		};
+
+		template<>
+		class GroupAccessor<GroupProperty::WRITE_ONLY>
+		{
+			friend IniParser;
+
+		public:
+			using group_type = unordered_map_type<string_view_type, string_view_type, string_hash_type>;
+
+		private:
+			group_type group_;
+
+			explicit GroupAccessor(const GroupAccessor<GroupProperty::READ_ONLY>::group_type& group);
+
+		public:
+			[[nodiscard]] auto empty() const noexcept -> bool { return group_.empty(); }
+
+			[[nodiscard]] auto size() const noexcept -> group_type::size_type { return group_.size(); }
+
+			[[nodiscard]] auto contains(const string_view_type key) const -> bool { return group_.contains(key); }
+
+			auto flush(string_view_type key, std::ostream& out) -> void;
+
+			auto flush_remainder(std::ostream& out) -> void;
+		};
+
+		template<>
+		class GroupAccessor<GroupProperty::WRITE_ONLY_WITH_COMMENT>
+		{
+			friend IniParserWithComment;
+
+		public:
+			struct variable_with_comment
+			{
+				comment_view_type comment;
+				string_view_type  variable;
+				comment_view_type inline_comment;
+			};
+
+			using group_type = unordered_map_type<string_view_type, variable_with_comment, string_hash_type>;
+
+			struct group_with_comment_type
+			{
+				comment_view_type comment;
+				comment_view_type inline_comment;
+				group_type        group;
+			};
+
+		private:
+			group_with_comment_type group_;
+
+			explicit GroupAccessor(const GroupAccessor<GroupProperty::READ_ONLY_WITH_COMMENT>::group_with_comment_type& group);
+
+		public:
+			[[nodiscard]] auto has_comment() const noexcept -> bool { return !group_.comment.empty(); }
+
+			[[nodiscard]] auto has_inline_comment() const noexcept -> bool { return !group_.inline_comment.empty(); }
+
+			[[nodiscard]] auto comment() const noexcept -> comment_view_type { return group_.comment; }
+
+			[[nodiscard]] auto inline_comment() const noexcept -> comment_view_type { return group_.inline_comment; }
+
+			[[nodiscard]] auto empty() const noexcept -> bool { return group_.group.empty(); }
+
+			[[nodiscard]] auto size() const noexcept -> group_type::size_type { return group_.group.size(); }
+
+			[[nodiscard]] auto contains(const string_view_type key) const -> bool { return group_.group.contains(key); }
+
+			auto flush(string_view_type key, std::ostream& out) -> void;
+
+			auto flush_remainder(std::ostream& out) -> void;
+		};
 	}// namespace detail
 
 	class IniParser
 	{
+		template<typename Ini, bool KeepComment>
+		friend class FlushState;
+
 	public:
 		using reader_type = detail::GroupAccessor<GroupProperty::READ_ONLY>;
 		using writer_type = detail::GroupAccessor<GroupProperty::READ_MODIFY>;
+		using flush_type = detail::GroupAccessor<GroupProperty::WRITE_ONLY>;
 
 		// key = value
 		using group_type = reader_type::group_type;
@@ -619,14 +654,16 @@ namespace gal::ini::impl
 		using context_type = unordered_table_type<group_type>;
 
 	private:
-		context_type  context_;
-		filename_type filename_;
+		context_type   context_;
+		file_path_type file_path_;
 
 	public:
-		explicit IniParser(filename_type&& filename);
+		explicit IniParser(file_path_type&& file_path);
 
-		explicit IniParser(const filename_type& filename)
-			: IniParser{filename_type{filename}} {}
+		explicit IniParser(const file_path_type& file_path)
+			: IniParser{file_path_type{file_path}} {}
+
+		[[nodiscard]] auto file_path() const noexcept -> const file_path_type& { return file_path_; }
 
 		[[nodiscard]] auto empty() const noexcept -> bool { return context_.empty(); }
 
@@ -669,12 +706,7 @@ namespace gal::ini::impl
 
 		[[nodiscard]] auto write(const string_view_type group_name) -> writer_type
 		{
-			if (const auto it =
-						#ifdef GAL_INI_COMPILER_GNU
-							context_.find(string_type{group_name});
-						#else
-						context_.find(group_name);
-				#endif
+			if (const auto it = map_transparent_find_invoker<context_type>::do_find(context_, group_name);
 				it != context_.end()) { return writer_type{it->second, it->first}; }
 
 			const auto result = context_.emplace(group_name, group_type{}).first;
@@ -690,10 +722,22 @@ namespace gal::ini::impl
 			return writer_type{result->second, result->first};
 		}
 
+	private:
+		auto flush(const string_view_type group_name) -> flush_type
+		{
+			if (const auto it = map_transparent_find_invoker<context_type>::do_find(context_, group_name);
+				it != context_.end()) { return flush_type{it->second}; }
+
+			return flush_type{{}};
+		}
+
+	public:
+		auto flush(bool keep_comments) -> void;
+
 		template<typename OStream>
 		auto print(
 				OStream&               out,
-				const string_view_type separator = detail::line_separator<string_view_type::value_type>()) const -> void requires
+				const string_view_type separator = line_separator) const -> void requires
 			requires
 			{
 				out << separator.data();
@@ -710,9 +754,13 @@ namespace gal::ini::impl
 
 	class IniParserWithComment
 	{
+		template<typename Ini>
+		friend class FlushStateWithComment;
+
 	public:
 		using reader_type = detail::GroupAccessor<GroupProperty::READ_ONLY_WITH_COMMENT>;
 		using writer_type = detail::GroupAccessor<GroupProperty::READ_MODIFY_WITH_COMMENT>;
+		using flush_type = detail::GroupAccessor<GroupProperty::WRITE_ONLY_WITH_COMMENT>;
 
 		using group_type = reader_type::group_type;
 		using group_with_comment_type = reader_type::group_with_comment_type;
@@ -726,14 +774,16 @@ namespace gal::ini::impl
 		using context_type = unordered_table_type<group_with_comment_type>;
 
 	private:
-		context_type  context_;
-		filename_type filename_;
+		context_type   context_;
+		file_path_type file_path_;
 
 	public:
-		explicit IniParserWithComment(filename_type&& filename);
+		explicit IniParserWithComment(file_path_type&& file_path);
 
-		explicit IniParserWithComment(const filename_type& filename)
-			: IniParserWithComment{filename_type{filename}} {}
+		explicit IniParserWithComment(const file_path_type& file_path)
+			: IniParserWithComment{file_path_type{file_path}} {}
+
+		[[nodiscard]] auto file_path() const noexcept -> const file_path_type& { return file_path_; }
 
 		[[nodiscard]] auto empty() const noexcept -> bool { return context_.empty(); }
 
@@ -797,10 +847,22 @@ namespace gal::ini::impl
 			return writer_type{result->second, result->first};
 		}
 
+	private:
+		auto flush(const string_view_type group_name) -> flush_type
+		{
+			if (const auto it = map_transparent_find_invoker<context_type>::do_find(context_, group_name);
+				it != context_.end()) { return flush_type{it->second}; }
+
+			return flush_type{{}};
+		}
+
+	public:
+		auto flush() -> void;
+
 		template<typename OStream>
 		auto print(
 				OStream&               out,
-				const string_view_type separator = detail::line_separator<string_view_type::value_type>()) const -> void requires requires
+				const string_view_type separator = line_separator) const -> void requires requires
 		{
 			out << separator.data();
 			out << string_type{};
