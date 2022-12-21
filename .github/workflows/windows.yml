@@ -19,7 +19,7 @@ jobs:
     strategy:
       matrix:
         toolset: [ClangCl, v143]
-        std: [20]
+        build_type: [Debug, Release]
 
     steps:
       - uses: actions/checkout@v3
@@ -31,11 +31,11 @@ jobs:
 
       - name: configure
         run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -G "Visual Studio 17 2022" -T ${{matrix.toolset}} -DCMAKE_CXX_STANDARD:STRING=${{matrix.std}}
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=${{matrix.build_type}} -T ${{matrix.toolset}}
       - name: build
         run: cmake --build build --config Debug -j4
 
       - name: test
         run: |
           cd build
-          ctest --build-config Debug
+          ctest --build-config ${{matrix.build_type}}
