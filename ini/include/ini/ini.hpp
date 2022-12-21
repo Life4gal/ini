@@ -30,23 +30,64 @@ namespace gal::ini
 
 	using file_path_type = std::filesystem::path;
 
+	enum class CommentIndication
+	{
+		INVALID,
+
+		HASH_SIGN = '#',
+		SEMICOLON = ';',
+	};
+
+	struct comment_type;
+
 	struct comment_view_type
 	{
-		char_type        indication;
-		string_view_type comment;
+		CommentIndication indication;
+		string_view_type  comment;
 
-		[[nodiscard]] constexpr auto empty() const noexcept -> bool { return comment.empty(); }
+		[[nodiscard]] constexpr auto empty() const noexcept -> bool { return indication == CommentIndication::INVALID; }
+
+		[[nodiscard]] constexpr auto operator==(const comment_view_type& other) const noexcept -> bool { return indication == other.indication && comment == other.comment; }
+
+		[[nodiscard]] constexpr auto operator==(const comment_type& other) const noexcept -> bool;
 	};
 
 	struct comment_type
 	{
-		char_type   indication;
-		string_type comment;
+		CommentIndication indication;
+		string_type       comment;
 
 		[[nodiscard]] constexpr auto empty() const noexcept -> bool { return comment.empty(); }
 
 		[[nodiscard]] constexpr explicit(false) operator comment_view_type() const noexcept { return {indication, comment}; }
+
+		[[nodiscard]] constexpr auto operator==(const comment_type& other) const noexcept -> bool { return indication == other.indication && comment == other.comment; }
 	};
+
+	constexpr auto comment_view_type::operator==(const comment_type& other) const noexcept -> bool { return *this == other.operator comment_view_type(); }
+
+	[[nodiscard]] constexpr auto make_comment_indication(const char indication) -> CommentIndication
+	{
+		using type = std::underlying_type_t<CommentIndication>;
+		if (static_cast<type>(CommentIndication::HASH_SIGN) == static_cast<type>(indication)) { return CommentIndication::HASH_SIGN; }
+
+		if (static_cast<type>(CommentIndication::SEMICOLON) == static_cast<type>(indication)) { return CommentIndication::SEMICOLON; }
+
+		return CommentIndication::INVALID;
+	}
+
+	[[nodiscard]] constexpr auto make_comment_indication(const CommentIndication indication) -> char
+	{
+		if (indication == CommentIndication::HASH_SIGN) { return '#'; }
+
+		if (indication == CommentIndication::SEMICOLON) { return ';'; }
+
+		GAL_INI_UNREACHABLE();
+	}
+
+	[[nodiscard]] constexpr auto make_comment(const CommentIndication indication, string_type&& comment) -> comment_type { return {.indication = indication, .comment = std::move(comment)}; }
+
+	[[nodiscard]] constexpr auto make_comment_view(const CommentIndication indication, const string_view_type comment) -> comment_view_type { return {.indication = indication, .comment = comment}; }
 
 	#ifndef GAL_INI_STRING_HASH_TYPE
 	struct string_hash_type

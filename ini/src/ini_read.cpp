@@ -154,7 +154,7 @@ namespace
 			: buffer_{ini.file_path(), buffer},
 			ini_{ini},
 			writer_{nullptr},
-			comment_{'\0', {}} {}
+			comment_{.indication = ini::CommentIndication::INVALID, .comment = {}} {}
 
 		auto comment(ini::comment_type&& comment) -> void { comment_ = std::move(comment); }
 
@@ -233,7 +233,7 @@ namespace
 				if constexpr (Required)
 				{
 					return callback<void>(
-							[](ParseState& state, ini::string_type&& context) -> void { state.comment({indication, std::move(context)}); });
+							[](ParseState& state, ini::string_type&& context) -> void { state.comment({.indication = ini::make_comment_indication(indication), .comment = std::move(context)}); });
 				}
 				else
 				{
@@ -266,7 +266,7 @@ namespace
 				if constexpr (Required)
 				{
 					return callback<ini::comment_type>(
-							[]([[maybe_unused]] ParseState& state, ini::string_type&& context) -> ini::comment_type { return {indication, std::move(context)}; });
+							[]([[maybe_unused]] ParseState& state, ini::string_type&& context) -> ini::comment_type { return {.indication = ini::make_comment_indication(indication), .comment = std::move(context)}; });
 				}
 				else
 				{
@@ -277,9 +277,9 @@ namespace
 		};
 
 		template<typename ParseState, bool Required>
-		using comment_hash_sign = comment<ParseState, Required, '#'>;
+		using comment_hash_sign = comment<ParseState, Required, make_comment_indication(ini::CommentIndication::HASH_SIGN)>;
 		template<typename ParseState, bool Required>
-		using comment_semicolon = comment<ParseState, Required, ';'>;
+		using comment_semicolon = comment<ParseState, Required, make_comment_indication(ini::CommentIndication::SEMICOLON)>;
 
 		template<typename ParseState, bool Required>
 		constexpr auto comment_production =
@@ -287,9 +287,9 @@ namespace
 				dsl::p<comment_semicolon<ParseState, Required>>;
 
 		template<typename ParseState, bool Required>
-		using comment_inline_hash_sign = comment_inline<ParseState, Required, '#'>;
+		using comment_inline_hash_sign = comment_inline<ParseState, Required, make_comment_indication(ini::CommentIndication::HASH_SIGN)>;
 		template<typename ParseState, bool Required>
-		using comment_inline_semicolon = comment_inline<ParseState, Required, ';'>;
+		using comment_inline_semicolon = comment_inline<ParseState, Required, make_comment_indication(ini::CommentIndication::SEMICOLON)>;
 
 		template<typename ParseState, bool Required>
 		constexpr auto comment_inline_production =

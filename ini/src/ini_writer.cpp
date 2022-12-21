@@ -108,7 +108,7 @@ namespace gal::ini::impl
 
 		auto flush_comment() -> void
 		{
-			if constexpr (keep_comments) { if (!last_comment_.empty()) { buffer_.writer() << last_comment_.indication << ' ' << last_comment_.comment << line_separator; } }
+			if constexpr (keep_comments) { if (!last_comment_.empty()) { buffer_.writer() << make_comment_indication(last_comment_.indication) << ' ' << last_comment_.comment << line_separator; } }
 
 			clear_comment();
 		}
@@ -133,7 +133,7 @@ namespace gal::ini::impl
 				flush_comment();
 
 				buffer_.writer() << '[' << group_name << ']';
-				if constexpr (keep_comments) { if (!inline_comment.empty()) { buffer_.writer() << ' ' << inline_comment.indication << ' ' << inline_comment.comment; } }
+				if constexpr (keep_comments) { if (!inline_comment.empty()) { buffer_.writer() << ' ' << make_comment_indication(inline_comment.indication) << ' ' << inline_comment.comment; } }
 				buffer_.writer() << line_separator;
 			}
 		}
@@ -148,7 +148,7 @@ namespace gal::ini::impl
 					flush_comment();
 					flusher_->flush(key, buffer_.writer());
 
-					if (!inline_comment.empty()) { buffer_.writer() << ' ' << inline_comment.indication << ' ' << inline_comment.comment; }
+					if (!inline_comment.empty()) { buffer_.writer() << ' ' << make_comment_indication(inline_comment.indication) << ' ' << inline_comment.comment; }
 					buffer_.writer() << line_separator;
 				}
 				else { clear_comment(); }
@@ -178,14 +178,14 @@ namespace gal::ini::impl
 			if (flusher.has_comment())
 			{
 				const auto& comment = flusher.comment();
-				buffer_.writer() << comment.indication << ' ' << comment.comment << line_separator;
+				buffer_.writer() << ini::make_comment_indication(comment.indication) << ' ' << comment.comment << line_separator;
 			}
 
 			buffer_.writer() << '[' << name << ']';
 			if (flusher.has_inline_comment())
 			{
 				const auto& inline_comment = flusher.inline_comment();
-				buffer_.writer() << inline_comment.indication << ' ' << inline_comment.comment << line_separator;
+				buffer_.writer() << ini::make_comment_indication(inline_comment.indication) << ' ' << inline_comment.comment << line_separator;
 			}
 			buffer_.writer() << line_separator;
 
@@ -267,9 +267,6 @@ namespace
 							// todo: multi-line comment
 							dsl::unicode::print - dsl::unicode::newline);
 
-			using a = lexy::_as_string<ini::string_view_type, default_encoding>;
-			using ac = a::_char_type;
-
 			constexpr static auto value = // lexy::as_string<ini::string_view_type, default_encoding>;
 					lexy::callback<ini::string_view_type>(
 							[](const lexy::lexeme<reader_type> lexeme) -> ini::string_view_type { return {reinterpret_cast<const ini::char_type*>(lexeme.data()), lexeme.size()}; });
@@ -293,7 +290,7 @@ namespace
 					dsl::newline);
 
 			constexpr static auto  value = callback<void>(
-					[](ParseState& state, const ini::string_view_type context) -> void { state.comment({indication, context}); });
+					[](ParseState& state, const ini::string_view_type context) -> void { state.comment({.indication = ini::make_comment_indication(indication), .comment = std::move(context)}); });
 		};
 
 		template<typename ParseState, char Indication>
@@ -315,13 +312,13 @@ namespace
 					LEXY_DEBUG("parse inline_comment end"));
 
 			constexpr static auto                   value = callback<ini::comment_view_type>(
-					[]([[maybe_unused]] ParseState& state, const ini::string_view_type context) -> ini::comment_view_type { return {indication, context}; });
+					[]([[maybe_unused]] ParseState& state, const ini::string_view_type context) -> ini::comment_view_type { return {.indication = ini::make_comment_indication(indication), .comment = std::move(context)}; });
 		};
 
 		template<typename ParseState>
-		using comment_hash_sign = comment<ParseState, '#'>;
+		using comment_hash_sign = comment<ParseState, make_comment_indication(ini::CommentIndication::HASH_SIGN)>;
 		template<typename ParseState>
-		using comment_semicolon = comment<ParseState, ';'>;
+		using comment_semicolon = comment<ParseState, make_comment_indication(ini::CommentIndication::SEMICOLON)>;
 
 		template<typename ParseState>
 		constexpr auto comment_production =
@@ -329,9 +326,9 @@ namespace
 				dsl::p<comment_semicolon<ParseState>>;
 
 		template<typename ParseState>
-		using comment_inline_hash_sign = comment_inline<ParseState, '#'>;
+		using comment_inline_hash_sign = comment_inline<ParseState, make_comment_indication(ini::CommentIndication::HASH_SIGN)>;
 		template<typename ParseState>
-		using comment_inline_semicolon = comment_inline<ParseState, ';'>;
+		using comment_inline_semicolon = comment_inline<ParseState, make_comment_indication(ini::CommentIndication::SEMICOLON)>;
 
 		template<typename ParseState>
 		constexpr auto comment_inline_production =
@@ -601,14 +598,14 @@ namespace gal::ini::impl
 				if (!it->second.comment.empty())
 				{
 					const auto& [indication, comment] = it->second.comment;
-					out << indication << ' ' << comment << line_separator;
+					out << make_comment_indication(indication) << ' ' << comment << line_separator;
 				}
 
 				out << it->first << '=' << it->second.variable;
 				if (!it->second.inline_comment.empty())
 				{
 					const auto& [indication, comment] = it->second.inline_comment;
-					out << indication << ' ' << comment << line_separator;
+					out << make_comment_indication(indication) << ' ' << comment << line_separator;
 				}
 				group_.group.erase(it);
 			}
@@ -621,14 +618,14 @@ namespace gal::ini::impl
 				if (!variable_with_comment.comment.empty())
 				{
 					const auto& [indication, comment] = variable_with_comment.comment;
-					out << indication << ' ' << comment << line_separator;
+					out << make_comment_indication(indication) << ' ' << comment << line_separator;
 				}
 
 				out << key << '=' << variable_with_comment.variable;
 				if (!variable_with_comment.inline_comment.empty())
 				{
 					const auto& [indication, comment] = variable_with_comment.inline_comment;
-					out << indication << ' ' << comment << line_separator;
+					out << make_comment_indication(indication) << ' ' << comment << line_separator;
 				}
 			}
 			group_.group.clear();
