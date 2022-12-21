@@ -12,7 +12,7 @@ using namespace gal::ini;
 #define GROUP4_NAME "group4 }{}{}{}{}{}{()()()())[[[[[[["
 #define GROUP5_NAME "group5 LKGP&ITIG&PG"
 
-suite generate_file = []
+suite generate_test_ini_reader_file = []
 {
 	const std::filesystem::path file_path{TEST_INI_READER_FILE_PATH};
 
@@ -45,7 +45,7 @@ suite generate_file = []
 	file.close();
 };
 
-suite test_group = []
+suite test_ini_reader_group_reader = []
 {
 	IniParser reader{TEST_INI_READER_FILE_PATH};
 
