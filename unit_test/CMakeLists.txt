@@ -57,3 +57,8 @@ target_link_libraries(
 #		PRIVATE
 #		CTP-shared
 #)
+
+add_test(
+		NAME ${PROJECT_NAME}
+		COMMAND ${PROJECT_NAME}
+)
