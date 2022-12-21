@@ -24,6 +24,8 @@ target_compile_definitions(
 	BOOST_UT_DISABLE_MODULE
 	TEST_INI_READER_FILE_PATH="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test_ini_reader.ini"
 	TEST_INI_READER_WITH_COMMENT_FILE_PATH="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test_ini_reader_with_comment.ini"
+	TEST_INI_WRITER_FILE_PATH="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test_ini_writer.ini"
+	TEST_INI_WRITER_WITH_COMMENT_FILE_PATH="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test_ini_writer_with_comment.ini"
 )
 
 set_compile_options_private(${PROJECT_NAME})
