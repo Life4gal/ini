@@ -1446,18 +1446,18 @@ namespace gal::ini::impl
 		{
 			for (const auto& [group_name, group_self]: context_)
 			{
-				if (!group_self.comment.empty()) { out << group_self.comment.indication << ' ' << group_self.comment.comment << separator.data(); }
+				if (!group_self.comment.empty()) { out << make_comment_indication(group_self.comment.indication) << ' ' << group_self.comment.comment << separator.data(); }
 
 				out << "[" << group_name << "]";
-				if (!group_self.inline_comment.empty()) { out << ' ' << group_self.inline_comment.indication << ' ' << group_self.inline_comment.comment; }
+				if (!group_self.inline_comment.empty()) { out << ' ' << make_comment_indication(group_self.inline_comment.indication) << ' ' << group_self.inline_comment.comment; }
 				out << separator.data();
 
 				for (const auto& [variable_key, variable_with_comment]: group_self.group)
 				{
-					if (!variable_with_comment.comment.empty()) { out << variable_with_comment.comment.indication << ' ' << variable_with_comment.comment.comment << separator.data(); }
+					if (!variable_with_comment.comment.empty()) { out << make_comment_indication(variable_with_comment.comment.indication) << ' ' << variable_with_comment.comment.comment << separator.data(); }
 
 					out << variable_key << "=" << variable_with_comment.variable;
-					if (!variable_with_comment.inline_comment.empty()) { out << ' ' << variable_with_comment.inline_comment.indication << ' ' << variable_with_comment.inline_comment.comment; }
+					if (!variable_with_comment.inline_comment.empty()) { out << ' ' << make_comment_indication(variable_with_comment.inline_comment.indication) << ' ' << variable_with_comment.inline_comment.comment; }
 					out << separator.data();
 				}
 			}
