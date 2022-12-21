@@ -155,6 +155,15 @@ namespace gal::ini::impl
 
 				template<std::size_t Index>
 					requires(Index < max_elements_size)
+				[[nodiscard]] auto get() & -> index_type<Index>&
+				{
+					if constexpr (Index == 0) { return node_.key(); }
+					else if constexpr (Index == 1) { return node_.mapped(); }
+					else { GAL_INI_UNREACHABLE(); }
+				}
+
+				template<std::size_t Index>
+					requires(Index < max_elements_size)
 				[[nodiscard]] auto get() && -> index_type<Index>&&
 				{
 					if constexpr (Index == 0) { return std::move(node_.key()); }
@@ -164,9 +173,13 @@ namespace gal::ini::impl
 
 				[[nodiscard]] auto key() const & -> string_view_type { return get<0>(); }
 
+				[[nodiscard]] auto key() & -> string_view_type { return get<0>(); }
+
 				[[nodiscard]] auto key() && -> string_type&& { return std::move(*this).get<0>(); }
 
 				[[nodiscard]] auto value() const & -> string_view_type { return get<1>(); }
+
+				[[nodiscard]] auto value() & -> string_view_type { return get<1>(); }
 
 				[[nodiscard]] auto value() && -> string_type&& { return std::move(*this).get<1>(); }
 
@@ -260,11 +273,7 @@ namespace gal::ini::impl
 
 			auto insert_or_assign(node_type&& node) -> result_type;
 
-			auto remove(const string_type& key) -> bool { return propagate_rep().erase(key); }
-
 			auto remove(const string_view_type key) -> bool { return map_transparent_modifier<group_type>::do_erase(propagate_rep(), key); }
-
-			auto extract(const string_type& key) -> node_type { return node_type{propagate_rep().extract(key)}; }
 
 			auto extract(const string_view_type key) -> node_type { return node_type{map_transparent_modifier<group_type>::do_extract(propagate_rep(), key)}; }
 		};
