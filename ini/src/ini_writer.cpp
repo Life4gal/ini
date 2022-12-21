@@ -598,7 +598,7 @@ namespace gal::ini::impl
 			if (const auto it = group_.find(key);
 				it != group_.end())
 			{
-				out << it->first << '=' << it->second << line_separator;
+				out << it->first << '=' << it->second;
 				group_.erase(it);
 			}
 		}
