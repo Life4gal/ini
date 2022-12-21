@@ -340,14 +340,14 @@ namespace gal::ini::impl
 				else { return !it->second.inline_comment.empty(); }
 			}
 
-			[[nodiscard]] auto get_comment(const string_view_type key) const -> comment_view_type
+			[[nodiscard]] auto comment(const string_view_type key) const -> comment_view_type
 			{
 				if (const auto it = map_transparent_find_invoker<group_type>::do_find(group_.group, key);
 					it != group_.group.end()) { return it->second.comment; }
 				return {};
 			}
 
-			[[nodiscard]] auto get_inline_comment(const string_view_type key) const -> comment_view_type
+			[[nodiscard]] auto inline_comment(const string_view_type key) const -> comment_view_type
 			{
 				if (const auto it = map_transparent_find_invoker<group_type>::do_find(group_.group, key);
 					it != group_.group.end()) { return it->second.inline_comment; }
@@ -411,6 +411,17 @@ namespace gal::ini::impl
 
 				template<std::size_t Index>
 					requires(Index < max_elements_size)
+				[[nodiscard]] auto get() & -> index_type<Index>&
+				{
+					if constexpr (Index == 0) { return node_.mapped().comment; }
+					else if constexpr (Index == 1) { return node_.key(); }
+					else if constexpr (Index == 2) { return node_.mapped().variable; }
+					else if constexpr (Index == 3) { return node_.mapped().inline_comment; }
+					else { GAL_INI_UNREACHABLE(); }
+				}
+
+				template<std::size_t Index>
+					requires(Index < max_elements_size)
 				[[nodiscard]] auto get() && -> index_type<Index>&&
 				{
 					if constexpr (Index == 0) { return std::move(node_.mapped().comment); }
@@ -422,17 +433,25 @@ namespace gal::ini::impl
 
 				[[nodiscard]] auto comment() const & -> comment_view_type { return get<0>(); }
 
+				[[nodiscard]] auto comment() & -> comment_view_type { return get<0>(); }
+
 				[[nodiscard]] auto comment() && -> comment_type&& { return std::move(*this).get<0>(); }
 
 				[[nodiscard]] auto key() const & -> string_view_type { return get<1>(); }
+
+				[[nodiscard]] auto key() & -> string_view_type { return get<1>(); }
 
 				[[nodiscard]] auto key() && -> string_type&& { return std::move(*this).get<1>(); }
 
 				[[nodiscard]] auto value() const & -> string_view_type { return get<2>(); }
 
+				[[nodiscard]] auto value() & -> string_view_type { return get<2>(); }
+
 				[[nodiscard]] auto value() && -> string_type&& { return std::move(*this).get<2>(); }
 
 				[[nodiscard]] auto inline_comment() const & -> comment_view_type { return get<3>(); }
+
+				[[nodiscard]] auto inline_comment() & -> comment_view_type { return get<3>(); }
 
 				[[nodiscard]] auto inline_comment() && -> comment_type&& { return std::move(*this).get<3>(); }
 
@@ -532,9 +551,9 @@ namespace gal::ini::impl
 
 			[[nodiscard]] auto has_inline_comment(const string_view_type key) const -> bool { return read_accessor_.has_inline_comment(key); }
 
-			[[nodiscard]] auto get_comment(const string_view_type key) const -> comment_view_type { return read_accessor_.get_comment(key); }
+			[[nodiscard]] auto comment(const string_view_type key) const -> comment_view_type { return read_accessor_.comment(key); }
 
-			[[nodiscard]] auto get_inline_comment(const string_view_type key) const -> comment_view_type { return read_accessor_.get_inline_comment(key); }
+			[[nodiscard]] auto inline_comment(const string_view_type key) const -> comment_view_type { return read_accessor_.inline_comment(key); }
 
 			auto try_insert(const string_type& key, string_type&& value, comment_type&& comment = {}, comment_type&& inline_comment = {}) -> result_type { return result_type{propagate_rep().group.try_emplace(key, read_accessor_type::variable_with_comment{std::move(comment), std::move(value), std::move(inline_comment)})}; }
 
@@ -552,11 +571,7 @@ namespace gal::ini::impl
 
 			auto insert_or_assign(node_type&& node) -> result_type;
 
-			auto remove(const string_type& key) -> bool { return propagate_rep().group.erase(key); }
-
 			auto remove(const string_view_type key) -> bool { return map_transparent_modifier<group_type>::do_erase(propagate_rep().group, key); }
-
-			auto extract(const string_type& key) -> node_type { return node_type{propagate_rep().group.extract(key)}; }
 
 			auto extract(const string_view_type key) -> node_type { return node_type{map_transparent_modifier<group_type>::do_extract(propagate_rep().group, key)}; }
 		};
@@ -803,12 +818,7 @@ namespace gal::ini::impl
 
 		[[nodiscard]] auto read(const string_view_type group_name) -> reader_type
 		{
-			if (const auto it =
-						#ifdef GAL_INI_COMPILER_GNU
-							context_.find(string_type{group_name});
-						#else
-						context_.find(group_name);
-				#endif
+			if (const auto it = map_transparent_find_invoker<context_type>::do_find(context_, group_name);
 				it != context_.end()) { return reader_type{it->second, it->first}; }
 
 			const auto result = context_.emplace(group_name, group_with_comment_type{}).first;
@@ -826,12 +836,7 @@ namespace gal::ini::impl
 
 		[[nodiscard]] auto write(const string_view_type group_name) -> writer_type
 		{
-			if (const auto it =
-						#ifdef GAL_INI_COMPILER_GNU
-							context_.find(string_type{group_name});
-						#else
-						context_.find(group_name);
-				#endif
+			if (const auto it = map_transparent_find_invoker<context_type>::do_find(context_, group_name);
 				it != context_.end()) { return writer_type{it->second, it->first}; }
 
 			const auto result = context_.emplace(group_name, group_with_comment_type{}).first;
