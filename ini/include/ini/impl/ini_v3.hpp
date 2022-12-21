@@ -660,7 +660,7 @@ namespace gal::ini::impl
 
 	class IniParser
 	{
-		template<typename Ini, bool KeepComment>
+		template<typename Ini, bool KeepComment, bool KeepEmptyGroup>
 		friend class FlushState;
 
 	public:
@@ -756,7 +756,7 @@ namespace gal::ini::impl
 		}
 
 	public:
-		auto flush(bool keep_comments) -> void;
+		auto flush(bool keep_comments = true, bool keep_empty_group = true) -> void;
 
 		template<typename OStream>
 		auto print(
@@ -778,7 +778,7 @@ namespace gal::ini::impl
 
 	class IniParserWithComment
 	{
-		template<typename Ini>
+		template<typename Ini, bool KeepEmptyGroup>
 		friend class FlushStateWithComment;
 
 	public:
@@ -871,7 +871,7 @@ namespace gal::ini::impl
 		}
 
 	public:
-		auto flush() -> void;
+		auto flush(bool keep_empty_group = true) -> void;
 
 		template<typename OStream>
 		auto print(

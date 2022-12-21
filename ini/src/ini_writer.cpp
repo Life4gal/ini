@@ -13,6 +13,8 @@
 #include <fstream>
 #include <unordered_set>
 
+//#define GAL_INI_TRACE_PARSE
+
 namespace
 {
 	namespace ini = gal::ini;
@@ -46,10 +48,14 @@ namespace
 			: file_path_{std::filesystem::temp_directory_path() / filename.filename()},
 			out_{file_path_, std::ios::out | std::ios::trunc} { }
 
+		[[nodiscard]] auto ready() const -> bool { return out_.is_open() && out_.good(); }
+
 		auto writer() -> out_type& { return out_; }
 
-		auto finish(const ini::file_path_type& filename) const -> void
+		auto finish(const ini::file_path_type& filename) -> void
 		{
+			out_.close();
+
 			std::filesystem::copy_file(
 					file_path_,
 					filename,
@@ -60,14 +66,15 @@ namespace
 
 namespace gal::ini::impl
 {
-	template<typename Ini, bool KeepComments>
+	template<typename Ini, bool KeepComments, bool KeepEmptyGroup>
 	class FlushState
 	{
 	public:
 		using ini_type = Ini;
 		using flush_type = typename ini_type::flush_type;
 
-		constexpr static bool keep_comments = KeepComments;
+		constexpr static bool keep_comments    = KeepComments;
+		constexpr static bool keep_empty_group = KeepEmptyGroup;
 
 	private:
 		Buffer buffer_;
@@ -78,9 +85,42 @@ namespace gal::ini::impl
 
 		std::unordered_set<string_view_type, string_hash_type> pending_flushed_groups_;
 
+		auto clear_last_comment() -> void { last_comment_ = {}; }
+
+		auto flush_last_comment() -> void
+		{
+			if constexpr (keep_comments)
+			{
+				if (!last_comment_.empty())
+				{
+					buffer_.writer() << make_comment_indication(last_comment_.indication) << ' ' << last_comment_.comment << line_separator;
+					clear_last_comment();
+				}
+			}
+		}
+
+		auto flush_group_head(const string_view_type name, const comment_view_type inline_comment = {}) -> void
+		{
+			flush_last_comment();
+
+			buffer_.writer() << '[' << name << ']';
+			if constexpr (keep_comments) { if (!inline_comment.empty()) { buffer_.writer() << ' ' << make_comment_indication(inline_comment.indication) << ' ' << inline_comment.comment; } }
+			buffer_.writer() << line_separator;
+		}
+
 		auto flush_group_remainder() -> void { if (flusher_) { flusher_->flush_remainder(buffer_.writer()); } }
 
-		auto flush_context_remainder() -> void { for (const auto& name: pending_flushed_groups_) { ini_.flush(name).flush_remainder(buffer_.writer()); } }
+		auto flush_context_remainder() -> void
+		{
+			for (const auto& name: pending_flushed_groups_)
+			{
+				auto flusher = ini_.flush(name);
+
+				buffer_.writer() << line_separator;
+				flush_group_head(name);
+				flusher.flush_remainder(buffer_.writer());
+			}
+		}
 
 	public:
 		explicit FlushState(ini_type& ini)
@@ -101,19 +141,10 @@ namespace gal::ini::impl
 			buffer_.finish(ini_.file_path());
 		}
 
+		[[nodiscard]] auto ready() const -> bool { return buffer_.ready(); }
+
 		auto comment(const comment_view_type comment) -> void { if constexpr (keep_comments) { last_comment_ = comment; } }
 
-	private:
-		auto clear_comment() -> void { if constexpr (keep_comments) { last_comment_ = {}; } }
-
-		auto flush_comment() -> void
-		{
-			if constexpr (keep_comments) { if (!last_comment_.empty()) { buffer_.writer() << make_comment_indication(last_comment_.indication) << ' ' << last_comment_.comment << line_separator; } }
-
-			clear_comment();
-		}
-
-	public:
 		auto begin_group(const string_view_type group_name, const comment_view_type inline_comment = {}) -> void
 		{
 			flush_group_remainder();
@@ -123,47 +154,38 @@ namespace gal::ini::impl
 
 			if (flusher_->empty())
 			{
-				// group has been removed, reset it
 				flusher_.reset();
 
-				clear_comment();
+				if constexpr (keep_empty_group) { flush_group_head(group_name, inline_comment); }
+				else { clear_last_comment(); }
 			}
-			else
-			{
-				flush_comment();
-
-				buffer_.writer() << '[' << group_name << ']';
-				if constexpr (keep_comments) { if (!inline_comment.empty()) { buffer_.writer() << ' ' << make_comment_indication(inline_comment.indication) << ' ' << inline_comment.comment; } }
-				buffer_.writer() << line_separator;
-			}
+			else { flush_group_head(group_name, inline_comment); }
 		}
 
 		auto value(const string_view_type key, const comment_view_type inline_comment = {}) -> void
 		{
-			if (!flusher_) { clear_comment(); }
-			else
+			if (flusher_ && flusher_->contains(key))
 			{
-				if (flusher_->contains(key))
-				{
-					flush_comment();
-					flusher_->flush(key, buffer_.writer());
+				flush_last_comment();
+				flusher_->flush(key, buffer_.writer());
 
-					if (!inline_comment.empty()) { buffer_.writer() << ' ' << make_comment_indication(inline_comment.indication) << ' ' << inline_comment.comment; }
-					buffer_.writer() << line_separator;
-				}
-				else { clear_comment(); }
+				if constexpr (keep_comments) { if (!inline_comment.empty()) { buffer_.writer() << ' ' << make_comment_indication(inline_comment.indication) << ' ' << inline_comment.comment; } }
+				buffer_.writer() << line_separator;
 			}
+			else { clear_last_comment(); }
 		}
 
 		auto blank_line() -> void { buffer_.writer() << line_separator; }
 	};
 
-	template<typename Ini>
+	template<typename Ini, bool KeepEmptyGroup>
 	class FlushStateWithComment
 	{
 	public:
 		using ini_type = Ini;
 		using flush_type = typename ini_type::flush_type;
+
+		constexpr static bool keep_empty_group = KeepEmptyGroup;
 
 	private:
 		Buffer buffer_;
@@ -185,11 +207,9 @@ namespace gal::ini::impl
 			if (flusher.has_inline_comment())
 			{
 				const auto& inline_comment = flusher.inline_comment();
-				buffer_.writer() << ini::make_comment_indication(inline_comment.indication) << ' ' << inline_comment.comment << line_separator;
+				buffer_.writer() << ini::make_comment_indication(inline_comment.indication) << ' ' << inline_comment.comment;
 			}
 			buffer_.writer() << line_separator;
-
-			flusher.flush_remainder(buffer_.writer());
 		}
 
 		auto flush_group_remainder() -> void { if (flusher_) { flusher_->flush_remainder(buffer_.writer()); } }
@@ -200,7 +220,9 @@ namespace gal::ini::impl
 			{
 				auto flusher = ini_.flush(name);
 
+				buffer_.writer() << line_separator;
 				flush_group_head(flusher, name);
+				flusher.flush_remainder(buffer_.writer());
 			}
 		}
 
@@ -222,6 +244,8 @@ namespace gal::ini::impl
 			buffer_.finish(ini_.file_path());
 		}
 
+		[[nodiscard]] auto ready() const -> bool { return buffer_.ready(); }
+
 		auto comment([[maybe_unused]] const comment_view_type comment) const -> void { (void)this; }
 
 		auto begin_group(const string_view_type group_name, [[maybe_unused]] const comment_view_type inline_comment = {}) -> void
@@ -233,7 +257,8 @@ namespace gal::ini::impl
 
 			if (flusher_->empty())
 			{
-				// group has been removed, reset it
+				if constexpr (keep_empty_group) { flush_group_head(*flusher_, group_name); }
+
 				flusher_.reset();
 			}
 			else { flush_group_head(*flusher_, group_name); }
@@ -529,6 +554,12 @@ namespace
 		{
 			FlushState state{ini};
 
+			if (!state.ready())
+			{
+				// todo: error?
+				return;
+			}
+
 			if (const auto result =
 						lexy::parse<grammar::file<FlushState>>(
 								file.buffer(),
@@ -567,7 +598,7 @@ namespace gal::ini::impl
 			if (const auto it = group_.find(key);
 				it != group_.end())
 			{
-				out << it->first << '=' << it->second;
+				out << it->first << '=' << it->second << line_separator;
 				group_.erase(it);
 			}
 		}
@@ -605,8 +636,10 @@ namespace gal::ini::impl
 				if (!it->second.inline_comment.empty())
 				{
 					const auto& [indication, comment] = it->second.inline_comment;
-					out << make_comment_indication(indication) << ' ' << comment << line_separator;
+					out << ' ' << make_comment_indication(indication) << ' ' << comment;
 				}
+				out << line_separator;
+
 				group_.group.erase(it);
 			}
 		}
@@ -625,18 +658,31 @@ namespace gal::ini::impl
 				if (!variable_with_comment.inline_comment.empty())
 				{
 					const auto& [indication, comment] = variable_with_comment.inline_comment;
-					out << make_comment_indication(indication) << ' ' << comment << line_separator;
+					out << ' ' << make_comment_indication(indication) << ' ' << comment;
 				}
+				out << line_separator;
 			}
 			group_.group.clear();
 		}
 	}// namespace detail
 
-	auto IniParser::flush(const bool keep_comments) -> void
+	auto IniParser::flush(const bool keep_comments, const bool keep_empty_group) -> void
 	{
-		if (keep_comments) { ::flush<FlushState<IniParser, true>>(*this); }
-		else { ::flush<FlushState<IniParser, false>>(*this); }
+		if (keep_comments)
+		{
+			if (keep_empty_group) { ::flush<FlushState<IniParser, true, true>>(*this); }
+			else { ::flush<FlushState<IniParser, true, false>>(*this); }
+		}
+		else
+		{
+			if (keep_empty_group) { ::flush<FlushState<IniParser, false, true>>(*this); }
+			else { ::flush<FlushState<IniParser, false, false>>(*this); }
+		}
 	}
 
-	auto IniParserWithComment::flush() -> void { ::flush<FlushStateWithComment<IniParserWithComment>>(*this); }
+	auto IniParserWithComment::flush(bool keep_empty_group) -> void
+	{
+		if (keep_empty_group) { ::flush<FlushStateWithComment<IniParserWithComment, true>>(*this); }
+		else { ::flush<FlushStateWithComment<IniParserWithComment, false>>(*this); }
+	}
 }
