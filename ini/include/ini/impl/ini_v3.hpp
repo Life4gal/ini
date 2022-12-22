@@ -1470,25 +1470,25 @@ namespace gal::ini::impl
 // ===========================
 
 template<>
-struct ::std::tuple_size<gal::ini::impl::detail::GroupAccessor<gal::ini::impl::GroupProperty::READ_MODIFY>::node_type>
+struct std::tuple_size<gal::ini::impl::detail::GroupAccessor<gal::ini::impl::GroupProperty::READ_MODIFY>::node_type>
 {
 	constexpr static std::size_t value = gal::ini::impl::detail::GroupAccessor<gal::ini::impl::GroupProperty::READ_MODIFY>::node_type::max_elements_size;
 };
 
 template<>
-struct ::std::tuple_size<gal::ini::impl::detail::GroupAccessor<gal::ini::impl::GroupProperty::READ_MODIFY>::result_type>
+struct std::tuple_size<gal::ini::impl::detail::GroupAccessor<gal::ini::impl::GroupProperty::READ_MODIFY>::result_type>
 {
 	constexpr static std::size_t value = gal::ini::impl::detail::GroupAccessor<gal::ini::impl::GroupProperty::READ_MODIFY>::result_type::max_elements_size;
 };
 
 template<std::size_t Index>
-struct ::std::tuple_element<Index, gal::ini::impl::detail::GroupAccessor<gal::ini::impl::GroupProperty::READ_MODIFY>::node_type>
+struct std::tuple_element<Index, gal::ini::impl::detail::GroupAccessor<gal::ini::impl::GroupProperty::READ_MODIFY>::node_type>
 {
 	using type = gal::ini::impl::detail::GroupAccessor<gal::ini::impl::GroupProperty::READ_MODIFY>::node_type::index_type<Index>;
 };
 
 template<std::size_t Index>
-struct ::std::tuple_element<Index, gal::ini::impl::detail::GroupAccessor<gal::ini::impl::GroupProperty::READ_MODIFY>::result_type>
+struct std::tuple_element<Index, gal::ini::impl::detail::GroupAccessor<gal::ini::impl::GroupProperty::READ_MODIFY>::result_type>
 {
 	using type = gal::ini::impl::detail::GroupAccessor<gal::ini::impl::GroupProperty::READ_MODIFY>::result_type::index_type<Index>;
 };
@@ -1498,25 +1498,25 @@ struct ::std::tuple_element<Index, gal::ini::impl::detail::GroupAccessor<gal::in
 // ===========================
 
 template<>
-struct ::std::tuple_size<gal::ini::impl::detail::GroupAccessor<gal::ini::impl::GroupProperty::READ_MODIFY_WITH_COMMENT>::node_type>
+struct std::tuple_size<gal::ini::impl::detail::GroupAccessor<gal::ini::impl::GroupProperty::READ_MODIFY_WITH_COMMENT>::node_type>
 {
 	constexpr static std::size_t value = gal::ini::impl::detail::GroupAccessor<gal::ini::impl::GroupProperty::READ_MODIFY_WITH_COMMENT>::node_type::max_elements_size;
 };
 
 template<>
-struct ::std::tuple_size<gal::ini::impl::detail::GroupAccessor<gal::ini::impl::GroupProperty::READ_MODIFY_WITH_COMMENT>::result_type>
+struct std::tuple_size<gal::ini::impl::detail::GroupAccessor<gal::ini::impl::GroupProperty::READ_MODIFY_WITH_COMMENT>::result_type>
 {
 	constexpr static std::size_t value = gal::ini::impl::detail::GroupAccessor<gal::ini::impl::GroupProperty::READ_MODIFY_WITH_COMMENT>::result_type::max_elements_size;
 };
 
 template<std::size_t Index>
-struct ::std::tuple_element<Index, gal::ini::impl::detail::GroupAccessor<gal::ini::impl::GroupProperty::READ_MODIFY_WITH_COMMENT>::node_type>
+struct std::tuple_element<Index, gal::ini::impl::detail::GroupAccessor<gal::ini::impl::GroupProperty::READ_MODIFY_WITH_COMMENT>::node_type>
 {
 	using type = gal::ini::impl::detail::GroupAccessor<gal::ini::impl::GroupProperty::READ_MODIFY_WITH_COMMENT>::node_type::index_type<Index>;
 };
 
 template<std::size_t Index>
-struct ::std::tuple_element<Index, gal::ini::impl::detail::GroupAccessor<gal::ini::impl::GroupProperty::READ_MODIFY_WITH_COMMENT>::result_type>
+struct std::tuple_element<Index, gal::ini::impl::detail::GroupAccessor<gal::ini::impl::GroupProperty::READ_MODIFY_WITH_COMMENT>::result_type>
 {
 	using type = gal::ini::impl::detail::GroupAccessor<gal::ini::impl::GroupProperty::READ_MODIFY_WITH_COMMENT>::result_type::index_type<Index>;
 };
