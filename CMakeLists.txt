@@ -64,6 +64,20 @@ include(cpm/cpm_config.cmake)
 include(cpm/CPM.cmake)
 
 add_subdirectory(ini)
-enable_testing()
-add_subdirectory(standalone_test)
-add_subdirectory(unit_test)
+
+set(INI_TOP_PROJECT OFF)
+if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+	set(INI_TOP_PROJECT ON)
+	message(STATUS "CMake version: ${CMAKE_VERSION}")
+endif ()
+
+option(INI_TEST, "build web view test" ${INI_TOP_PROJECT})
+
+if (INI_TEST)
+	message("[INI] build test...")
+	enable_testing()
+	add_subdirectory(standalone_test)
+	add_subdirectory(unit_test)
+else()
+	message("[INI] drop test...")
+endif (INI_TEST)
