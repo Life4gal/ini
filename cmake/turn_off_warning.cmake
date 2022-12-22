@@ -13,22 +13,22 @@ set(
 		GSL_CLANG_CL_WARNINGS
 
 		# for ut :(
-		-Wno-global-constructors
-		-Wno-exit-time-destructors
-		-Wno-ctad-maybe-unsupported
-		-Wno-missing-variable-declarations
-		-Wno-sign-compare
+		# -Wno-global-constructors
+		# -Wno-exit-time-destructors
+		# -Wno-ctad-maybe-unsupported
+		# -Wno-missing-variable-declarations
+		# -Wno-sign-compare
 )
 
 set(
 		GSL_CLANG_WARNINGS
 
 		# for ut :(
-		-Wno-global-constructors
-		-Wno-exit-time-destructors
-		-Wno-ctad-maybe-unsupported
-		-Wno-missing-variable-declarations
-		-Wno-sign-compare
+		# -Wno-global-constructors
+		# -Wno-exit-time-destructors
+		# -Wno-ctad-maybe-unsupported
+		# -Wno-missing-variable-declarations
+		# -Wno-sign-compare
 )
 
 macro(turn_off_warning target_name)
@@ -40,8 +40,8 @@ macro(turn_off_warning target_name)
 			$<$<CXX_COMPILER_ID:MSVC>:${GSL_MSVC_WARNINGS}>
 			$<$<CXX_COMPILER_ID:GNU>:${GSL_GNU_WARNINGS}>
 			# clang-cl
-			$<$<AND:$<CXX_COMPILER_ID:Clang>,$<STREQUAL:"${CMAKE_CXX_SIMULATE_ID}","MSVC">>:${GSL_CLANG_CL_WARNINGS}>
+			$<$<AND:$<CXX_COMPILER_ID:Clang>,$<STREQUAL: "${CMAKE_CXX_SIMULATE_ID}" ,"MSVC">>:${GSL_CLANG_CL_WARNINGS}>
 			# clang
-			$<$<AND:$<CXX_COMPILER_ID:Clang>,$<NOT:$<STREQUAL:"${CMAKE_CXX_SIMULATE_ID}","MSVC">>>:${GSL_CLANG_WARNINGS}>
+			$<$<AND:$<CXX_COMPILER_ID:Clang>,$<NOT:$<STREQUAL: "${CMAKE_CXX_SIMULATE_ID}" ,"MSVC">>>:${GSL_CLANG_WARNINGS}>
 	)
 endmacro()

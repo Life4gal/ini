@@ -29,5 +29,5 @@ target_link_libraries(
 		gal::ini-static
 )
 
-set_compile_options_private(${PROJECT_NAME})
+set_compile_property(${PROJECT_NAME})
 turn_off_warning(${PROJECT_NAME})

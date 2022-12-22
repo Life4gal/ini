@@ -19,8 +19,6 @@ add_library(
 		${${PROJECT_NAME}_SOURCE}
 )
 
-set_property(TARGET ${PROJECT_NAME}-objlib PROPERTY POSITION_INDEPENDENT_CODE ON)
-
 target_include_directories(
 		${PROJECT_NAME}-objlib
 		PUBLIC
@@ -52,6 +50,9 @@ target_compile_definitions(
 CPM_link_libraries_DECL()
 include(${${PROJECT_NAME_PREFIX}CMAKE_3RDPARTY_PATH}/lexy.cmake)
 CPM_link_libraries_LINK(${PROJECT_NAME}-objlib)
+
+set_compile_property(${PROJECT_NAME}-objlib)
+turn_off_warning(${PROJECT_NAME}-objlib)
 
 # shared and static libraries built from the same object files
 # see target_link_libraries below (in project_setup)
@@ -86,9 +87,6 @@ function(project_setup project_name)
 			PUBLIC
 			${PROJECT_NAME}-objlib
 	)
-
-	set_compile_options_private(${project_name})
-	turn_off_warning(${project_name})
 endfunction(project_setup)
 
 project_setup(${PROJECT_NAME}-shared)

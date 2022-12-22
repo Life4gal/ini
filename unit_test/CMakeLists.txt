@@ -28,9 +28,6 @@ target_compile_definitions(
 	TEST_INI_WRITER_WITH_COMMENT_FILE_PATH="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test_ini_writer_with_comment.ini"
 )
 
-set_compile_options_private(${PROJECT_NAME})
-turn_off_warning(${PROJECT_NAME})
-
 CPM_link_libraries_DECL()
 include(${${PROJECT_NAME_PREFIX}CMAKE_3RDPARTY_PATH}/boost-ext-ut.cmake)
 CPM_link_libraries_LINK(${PROJECT_NAME})
@@ -42,21 +39,8 @@ target_link_libraries(
 		gal::ini-static
 )
 
-# cmake try to find 'bin\CMakeTemplateProject-impl-shared.lib' but it not exist if did not exported any symbol...
-#get_target_property(CTP-shared-original-name gal::CTP-shared ALIASED_TARGET)
-#add_library(CTP-shared SHARED IMPORTED)
-#set_target_properties(
-#		CTP-shared PROPERTIES
-##		IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/${CTP-shared-original-name}.dll
-#		IMPORTED_LOCATION ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${CTP-shared-original-name}.dll
-##		IMPORTED_IMPLIB ${CMAKE_BINARY_DIR}/${CTP-shared-original-name}.lib
-#		IMPORTED_IMPLIB ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${CTP-shared-original-name}.lib
-#)
-#target_link_libraries(
-#		${PROJECT_NAME}
-#		PRIVATE
-#		CTP-shared
-#)
+set_compile_property(${PROJECT_NAME})
+turn_off_warning(${PROJECT_NAME})
 
 add_test(
 		NAME ${PROJECT_NAME}
