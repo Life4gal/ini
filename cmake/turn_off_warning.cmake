@@ -12,9 +12,11 @@ set(
 set(
 		GSL_CLANG_CL_WARNINGS
 
+		-Wno-c++20-compat
+
 		# for ut :(
 		-Wno-global-constructors
-		# -Wno-exit-time-destructors
+		-Wno-exit-time-destructors
 		# -Wno-ctad-maybe-unsupported
 		# -Wno-missing-variable-declarations
 		# -Wno-sign-compare
@@ -23,9 +25,11 @@ set(
 set(
 		GSL_CLANG_WARNINGS
 
+		-Wno-c++20-compat
+
 		# for ut :(
 		-Wno-global-constructors
-		# -Wno-exit-time-destructors
+		-Wno-exit-time-destructors
 		# -Wno-ctad-maybe-unsupported
 		# -Wno-missing-variable-declarations
 		# -Wno-sign-compare
