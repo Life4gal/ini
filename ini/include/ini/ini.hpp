@@ -128,7 +128,7 @@ namespace gal::ini
 	{
 		if constexpr (std::is_same_v<Char, wchar_t>)
 		{
-			#ifdef GAL_INI_COMPILER_MSVC
+			#ifdef GAL_INI_PLATFORM_WINDOWS
 			return L"\n";
 			#else
 			return L"\r\n";
@@ -136,7 +136,7 @@ namespace gal::ini
 		}
 		else if constexpr (std::is_same_v<Char, char8_t>)
 		{
-			#ifdef GAL_INI_COMPILER_MSVC
+			#ifdef GAL_INI_PLATFORM_WINDOWS
 			return u8"\n";
 			#else
 			return u8"\r\n";
@@ -144,7 +144,7 @@ namespace gal::ini
 		}
 		else if constexpr (std::is_same_v<Char, char16_t>)
 		{
-			#ifdef GAL_INI_COMPILER_MSVC
+			#ifdef GAL_INI_PLATFORM_WINDOWS
 			return u"\n";
 			#else
 			return u"\r\n";
@@ -152,7 +152,7 @@ namespace gal::ini
 		}
 		else if constexpr (std::is_same_v<Char, char32_t>)
 		{
-			#ifdef GAL_INI_COMPILER_MSVC
+			#ifdef GAL_INI_PLATFORM_WINDOWS
 			return U"\n";
 			#else
 			return U"\r\n";
@@ -160,7 +160,7 @@ namespace gal::ini
 		}
 		else
 		{
-			#ifdef GAL_INI_COMPILER_MSVC
+			#ifdef GAL_INI_PLATFORM_WINDOWS
 			return "\n";
 			#else
 			return "\r\n";
