@@ -13,7 +13,7 @@ set(
 		GSL_CLANG_CL_WARNINGS
 
 		# for ut :(
-		# -Wno-global-constructors
+		-Wno-global-constructors
 		# -Wno-exit-time-destructors
 		# -Wno-ctad-maybe-unsupported
 		# -Wno-missing-variable-declarations
@@ -24,7 +24,7 @@ set(
 		GSL_CLANG_WARNINGS
 
 		# for ut :(
-		# -Wno-global-constructors
+		-Wno-global-constructors
 		# -Wno-exit-time-destructors
 		# -Wno-ctad-maybe-unsupported
 		# -Wno-missing-variable-declarations
