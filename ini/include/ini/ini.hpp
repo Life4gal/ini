@@ -11,7 +11,7 @@
 
 #if defined(GAL_INI_COMPILER_MSVC) || defined(_MSC_VER)
 #define GAL_INI_UNREACHABLE() __assume(0)
-#elif defined(GAL_INI_COMPILER_GNU) || defined(GAL_INI_COMPILER_CLANG) || defined(__GNUC__) || defined(__clang__)
+#elif defined(GAL_INI_COMPILER_GNU) || defined(GAL_INI_COMPILER_CLANG) || defined(GAL_INI_COMPILER_APPLE_CLANG) || defined(__GNUC__) || defined(__clang__)
 	#define GAL_INI_UNREACHABLE() __builtin_unreachable()
 #else
 	#define GAL_INI_UNREACHABLE() throw
@@ -19,7 +19,7 @@
 
 #include <version>
 #ifdef __has_cpp_attribute
-	#if defined(__cpp_lib_constexpr_string) // __has_cpp_attribute(__cpp_lib_constexpr_string)
+	#if !defined(GAL_INI_COMPILER_GNU) && !defined(GAL_INI_COMPILER_APPLE_CLANG) // defined(__cpp_lib_constexpr_string) // __has_cpp_attribute(__cpp_lib_constexpr_string)
 		#define GAL_INI_STRING_CONSTEXPR constexpr
 	#else
 		#define GAL_INI_STRING_CONSTEXPR inline
