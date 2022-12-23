@@ -586,11 +586,18 @@ namespace gal::ini::impl
 	{
 		GroupAccessor<GroupProperty::WRITE_ONLY>::GroupAccessor(const GroupAccessor<GroupProperty::READ_ONLY>::group_type& group)
 		{
+#if defined(GAL_INI_COMPILER_APPLE_CLANG)
+			for(const auto& [key, value] : group)
+			{
+				group_.emplace(key, value);
+			}
+#else
 			std::ranges::transform(
 					group,
 					std::inserter(group_, group_.end()),
 					[](const auto& pair) -> group_type::value_type { return group_type::value_type{pair.first, pair.second}; }
 					);
+#endif
 		}
 
 		auto GroupAccessor<GroupProperty::WRITE_ONLY>::flush(const string_view_type key, std::ostream& out) -> void
@@ -611,11 +618,18 @@ namespace gal::ini::impl
 
 		GroupAccessor<GroupProperty::WRITE_ONLY_WITH_COMMENT>::GroupAccessor(const GroupAccessor<GroupProperty::READ_ONLY_WITH_COMMENT>::group_with_comment_type& group)
 		{
+#if defined(GAL_INI_COMPILER_APPLE_CLANG)
+			for(const auto& [key, value_with_comment] : group.group)
+			{
+				group_.group.emplace(key, variable_with_comment{.comment = value_with_comment.comment, .variable = value_with_comment.variable, .inline_comment = value_with_comment.inline_comment});
+			}
+#else
 			std::ranges::transform(
 					group.group,
 					std::inserter(group_.group, group_.group.end()),
 					[](const auto& pair) -> group_type::value_type { return group_type::value_type{pair.first, variable_with_comment{.comment = pair.second.comment, .variable = pair.second.variable, .inline_comment = pair.second.inline_comment}}; }
 					);
+#endif
 
 			group_.comment        = group.comment;
 			group_.inline_comment = group.inline_comment;
