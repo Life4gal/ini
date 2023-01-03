@@ -1,5 +1,5 @@
 project(
-		GAL-INI-unit-test
+		ini-unit-test
 		LANGUAGES CXX
 )
 
@@ -28,19 +28,13 @@ target_compile_definitions(
 	TEST_INI_WRITER_WITH_COMMENT_FILE_PATH="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test_ini_writer_with_comment.ini"
 )
 
-CPM_link_libraries_DECL()
-include(${${PROJECT_NAME_PREFIX}CMAKE_3RDPARTY_PATH}/boost-ext-ut.cmake)
-CPM_link_libraries_LINK(${PROJECT_NAME})
+include(${${PROJECT_NAME_PREFIX}3RD_PARTY_PATH}/ut/ut.cmake)
 
 target_link_libraries(
 		${PROJECT_NAME}
 		PRIVATE
-#		gal::ini-shared
-		gal::ini-static
+		gal::ini
 )
-
-set_compile_property(${PROJECT_NAME})
-turn_off_warning(${PROJECT_NAME})
 
 add_test(
 		NAME ${PROJECT_NAME}

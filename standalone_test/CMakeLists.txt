@@ -1,5 +1,5 @@
 project(
-		GAL-INI-standalone-test
+		ini-standalone-test
 		LANGUAGES CXX
 )
 
@@ -26,8 +26,10 @@ target_include_directories(
 target_link_libraries(
 		${PROJECT_NAME}
 		PRIVATE
-		gal::ini-static
+		gal::ini
 )
 
-set_compile_property(${PROJECT_NAME})
-turn_off_warning(${PROJECT_NAME})
+add_test(
+		NAME ${PROJECT_NAME}
+		COMMAND ${PROJECT_NAME}
+)

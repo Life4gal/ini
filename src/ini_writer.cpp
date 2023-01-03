@@ -1,17 +1,18 @@
 #include <algorithm>
 #include <filesystem>
-#include <ini/ini.hpp>
-#include <lexy/action/parse.hpp>
-#include <lexy/action/trace.hpp>
-#include <lexy/callback.hpp>
-#include <lexy/dsl.hpp>
-#include <lexy/input/file.hpp>
-#include <lexy/visualize.hpp>
-#include <lexy_ext/report_error.hpp>
+#include <fstream>
 #include <memory>
 #include <ranges>
-#include <fstream>
 #include <unordered_set>
+
+#include "ini/ini.hpp"
+#include "lexy/action/parse.hpp"
+#include "lexy/action/trace.hpp"
+#include "lexy/callback.hpp"
+#include "lexy/dsl.hpp"
+#include "lexy/input/file.hpp"
+#include "lexy/visualize.hpp"
+#include "lexy_ext/report_error.hpp"
 
 //#define GAL_INI_TRACE_PARSE
 
