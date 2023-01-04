@@ -49,7 +49,7 @@ namespace
 
 	suite test_ini_reader_group_reader = []
 	{
-#ifdef GAL_INI_COMPILER_APPLE_CLANG
+#if defined(GAL_INI_COMPILER_APPLE_CLANG)  || defined(GAL_INI_COMPILER_CLANG_CL)
 		auto  workaround_extract_result_data = IniExtractor::extract_from_file(TEST_INI_READER_FILE_PATH);
 		auto& extract_result				 = workaround_extract_result_data.first;
 		auto& data							 = workaround_extract_result_data.second;
@@ -142,7 +142,7 @@ namespace
 
 	suite test_ini_reader_group_modifier = []
 	{
-#ifdef GAL_INI_COMPILER_APPLE_CLANG
+#if defined(GAL_INI_COMPILER_APPLE_CLANG)  || defined(GAL_INI_COMPILER_CLANG_CL)
 		auto  workaround_extract_result_data = IniExtractor::extract_from_file(TEST_INI_READER_FILE_PATH);
 		auto& extract_result				 = workaround_extract_result_data.first;
 		auto& data							 = workaround_extract_result_data.second;

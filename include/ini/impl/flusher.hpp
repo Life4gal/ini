@@ -125,7 +125,6 @@ namespace gal::ini::impl
 		/**
 		 * @brief Flush the currently saved content into the file, and keep the original order.
 		 * @param file_path The file path.
-		 * @param keep_comment Whether to keep the comments. (We read the content ignoring the comments, and can decide whether to remove the original comments when writing back to the file)
 		 * @param keep_empty_group Whether to keep empty groups. (If a group does not have any values, we can decide if we want to keep the group in the file or not)
 		 * @return Whether the flush was successful or not.
 		 * @note If the target file does not exist, nothing is done (the flush is considered to have failed), and no order is guaranteed for the new (non-existent in the source file) data.

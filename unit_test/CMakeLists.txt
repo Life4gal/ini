@@ -36,6 +36,21 @@ target_link_libraries(
 		gal::ini
 )
 
+set(
+		UT_WARNINGS
+
+		-Wno-global-constructors
+)
+
+target_compile_options(
+		${PROJECT_NAME}
+		PRIVATE
+
+		# for ut
+		# clang-cl
+		$<$<AND:$<CXX_COMPILER_ID:Clang>,$<STREQUAL:"${CMAKE_CXX_SIMULATE_ID}","MSVC">>:${UT_WARNINGS}>
+)
+
 add_test(
 		NAME ${PROJECT_NAME}
 		COMMAND ${PROJECT_NAME}
