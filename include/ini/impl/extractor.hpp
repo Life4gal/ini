@@ -1,8 +1,10 @@
 #pragma once
 
+#include <ini/impl/group_accessor.hpp>
+
 namespace gal::ini::impl
 {
-	enum class FileReadResult
+	enum class FileExtractResult
 	{
 		// The file was not found.
 		FILE_NOT_FOUND,
@@ -42,14 +44,14 @@ namespace gal::ini::impl
 		 * @param out The dest to write.
 		 * @return The result of reading the file.
 		 */
-		static auto extract_from_file(file_path_type file_path, context_type& out) -> FileReadResult;
+		static auto extract_from_file(file_path_type file_path, context_type& out) -> FileExtractResult;
 
 		/**
 		 * @brief Reads data from a file and return result of reading the file.
 		 * @param file_path The file path.
 		 * @return The result of reading the file.
 		 */
-		static auto extract_from_file(file_path_type file_path) -> std::pair<FileReadResult, context_type>;
+		static auto extract_from_file(file_path_type file_path) -> std::pair<FileExtractResult, context_type>;
 
 		/**
 		 * @brief Reads data from a memory buffer and writes the result to out.
@@ -96,14 +98,14 @@ namespace gal::ini::impl
 		 * @param out The dest to write.
 		 * @return The result of reading the file.
 		 */
-		static auto extract_from_file(file_path_type file_path, context_type& out) -> FileReadResult;
+		static auto extract_from_file(file_path_type file_path, context_type& out) -> FileExtractResult;
 
 		/**
 		 * @brief Reads data from a file and return result of reading the file.
 		 * @param file_path The file path.
 		 * @return The result of reading the file.
 		 */
-		static auto extract_from_file(file_path_type file_path) -> std::pair<FileReadResult, context_type>;
+		static auto extract_from_file(file_path_type file_path) -> std::pair<FileExtractResult, context_type>;
 
 		/**
 		 * @brief Reads data from a memory buffer and writes the result to out.

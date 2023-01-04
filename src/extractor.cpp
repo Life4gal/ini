@@ -609,12 +609,12 @@ namespace
 namespace gal::ini::impl
 {
 	template<typename Extractor, typename State>
-	auto do_extract_from_file(typename Extractor::file_path_type file_path, typename Extractor::context_type& out) -> FileReadResult
+	auto do_extract_from_file(typename Extractor::file_path_type file_path, typename Extractor::context_type& out) -> FileExtractResult
 	{
 		std::filesystem::path path{file_path};
 		if (!exists(path))
 		{
-			return FileReadResult::FILE_NOT_FOUND;
+			return FileExtractResult::FILE_NOT_FOUND;
 		}
 
 		if (auto file = lexy::read_file<default_encoding>(file_path.data());
@@ -624,17 +624,18 @@ namespace gal::ini::impl
 			{
 				case lexy::file_error::file_not_found:
 				{
-					return FileReadResult::FILE_NOT_FOUND;
+					return FileExtractResult::FILE_NOT_FOUND;
 				}
 				case lexy::file_error::permission_denied:
 				{
-					return FileReadResult::PERMISSION_DENIED;
+					return FileExtractResult::PERMISSION_DENIED;
 				}
 				case lexy::file_error::os_error:
 				{
-					return FileReadResult::INTERNAL_ERROR;
+					return FileExtractResult::INTERNAL_ERROR;
 				}
 				case lexy::file_error::_success:
+				default:
 				{
 					GAL_INI_UNREACHABLE();
 				}
@@ -646,7 +647,7 @@ namespace gal::ini::impl
 
 			extract(state);
 
-			return FileReadResult::SUCCESS;
+			return FileExtractResult::SUCCESS;
 		}
 	}
 
@@ -663,12 +664,12 @@ namespace gal::ini::impl
 	}
 
 
-	auto IniExtractor::extract_from_file(file_path_type file_path, context_type& out) -> FileReadResult
+	auto IniExtractor::extract_from_file(file_path_type file_path, context_type& out) -> FileExtractResult
 	{
 		return do_extract_from_file<IniExtractor, ExtractorState>(file_path, out);
 	}
 
-	auto IniExtractor::extract_from_file(file_path_type file_path) -> std::pair<FileReadResult, context_type>
+	auto IniExtractor::extract_from_file(file_path_type file_path) -> std::pair<FileExtractResult, context_type>
 	{
 		context_type out{};
 		auto		 result = extract_from_file(file_path, out);
@@ -687,12 +688,12 @@ namespace gal::ini::impl
 		return out;
 	}
 
-	auto IniExtractorWithComment::extract_from_file(file_path_type file_path, context_type& out) -> FileReadResult
+	auto IniExtractorWithComment::extract_from_file(file_path_type file_path, context_type& out) -> FileExtractResult
 	{
 		return do_extract_from_file<IniExtractorWithComment, ExtractorStateWithComment>(file_path, out);
 	}
 
-	auto IniExtractorWithComment::extract_from_file(file_path_type file_path) -> std::pair<FileReadResult, context_type>
+	auto IniExtractorWithComment::extract_from_file(file_path_type file_path) -> std::pair<FileExtractResult, context_type>
 	{
 		context_type out{};
 		auto		 result = extract_from_file(file_path, out);
