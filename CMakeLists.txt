@@ -14,7 +14,7 @@ set(
 
 set(
 		${PROJECT_NAME_PREFIX}PATCH_VERSION
-		0
+		1
 )
 
 set(${PROJECT_NAME_PREFIX}VERSION ${${PROJECT_NAME_PREFIX}MAJOR_VERSION}.${${PROJECT_NAME_PREFIX}MINOR_VERSION}.${${PROJECT_NAME_PREFIX}PATCH_VERSION})
@@ -189,6 +189,10 @@ set(
 		${PROJECT_NAME_PREFIX}HEADER
 
 		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/ini.hpp
+		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/impl/group_accessor.hpp
+		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/impl/extractor.hpp
+		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/impl/manager.hpp
+		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/impl/flusher.hpp
 )
 
 # SOURCE FILES
@@ -202,8 +206,9 @@ set(
 set(
 		${PROJECT_NAME_PREFIX}SOURCE
 
-		${PROJECT_SOURCE_DIR}/src/ini_read.cpp
-		${PROJECT_SOURCE_DIR}/src/ini_writer.cpp
+		${PROJECT_SOURCE_DIR}/src/group_accessor.cpp
+		${PROJECT_SOURCE_DIR}/src/extractor.cpp
+		${PROJECT_SOURCE_DIR}/src/flusher.cpp
 )
 
 # LIBRARY
