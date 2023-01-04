@@ -177,7 +177,7 @@ namespace
 			  writer_{nullptr},
 			  last_comment_{ini::make_comment_view(ini::CommentIndication::INVALID, {})}
 		{
-#if defined(GAL_INI_COMPILER_APPLE_CLANG)
+#if defined(GAL_INI_COMPILER_APPLE_CLANG) || defined(GAL_INI_COMPILER_CLANG)
 			for (const auto& [group_name, _]: context_)
 			{
 				pending_flush_group_.insert(group_name);
@@ -329,7 +329,7 @@ namespace
 			  context_{context},
 			  writer_{nullptr}
 		{
-#if defined(GAL_INI_COMPILER_APPLE_CLANG)
+#if defined(GAL_INI_COMPILER_APPLE_CLANG) || defined(GAL_INI_COMPILER_CLANG)
 			for (const auto& [group_name, _]: context_)
 			{
 				pending_flush_group_.insert(group_name);
