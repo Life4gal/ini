@@ -77,6 +77,7 @@ namespace
 		auto operator<<(const Data& data) -> AutoFile&
 		{
 			out_ << data;
+			return *this;
 		}
 	};
 
@@ -716,6 +717,7 @@ namespace gal::ini::impl
 					return FileFlushResult::INTERNAL_ERROR;
 				}
 				case lexy::file_error::_success:
+				default:
 				{
 					GAL_INI_UNREACHABLE();
 				}

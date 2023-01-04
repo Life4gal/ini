@@ -51,13 +51,16 @@ namespace gal::ini::impl
 		 * @brief Flush the currently saved content into the out.
 		 * @param out The destination.
 		 */
-		auto flush(ostream_type& out) -> void
+		template<typename Out>
+			requires requires(Out& out) {
+						 std::declval<write_type>().flush_remainder(out);
+					 }
+		auto flush(Out& out) -> void
 		{
 			for (const auto& group: context_)
 			{
 				write_type writer{group.second};
-				writer.flush_remainder(out);
-				out << line_separator;
+				writer.flush_remainder(out) << line_separator;
 			}
 		}
 
@@ -69,7 +72,7 @@ namespace gal::ini::impl
 		 * @return Whether the flush was successful or not.
 		 * @note If the target file does not exist, nothing is done (the flush is considered to have failed), and no order is guaranteed for the new (non-existent in the source file) data.
 		 */
-		auto flush_override(file_path_type file_path, bool keep_comments, bool keep_empty_group) const -> FileFlushResult;
+		[[nodiscard]] auto flush_override(file_path_type file_path, bool keep_comments = true, bool keep_empty_group = true) const -> FileFlushResult;
 	};
 
 	class IniFlusherWithComment
@@ -106,13 +109,16 @@ namespace gal::ini::impl
 		 * @brief Flush the currently saved content into the out.
 		 * @param out The destination.
 		 */
-		auto flush(ostream_type& out) -> void
+		template<typename Out>
+			requires requires(Out& out) {
+						 std::declval<write_type>().flush_remainder(out);
+					 }
+		auto flush(Out& out) -> void
 		{
 			for (const auto& group: context_)
 			{
 				write_type writer{group.second};
-				writer.flush_remainder(out);
-				out << line_separator;
+				writer.flush_remainder(out) << line_separator;
 			}
 		}
 
@@ -124,6 +130,6 @@ namespace gal::ini::impl
 		 * @return Whether the flush was successful or not.
 		 * @note If the target file does not exist, nothing is done (the flush is considered to have failed), and no order is guaranteed for the new (non-existent in the source file) data.
 		 */
-		auto flush_override(file_path_type file_path, bool keep_empty_group) const -> FileFlushResult;
+		[[nodiscard]] auto flush_override(file_path_type file_path, bool keep_empty_group = true) const -> FileFlushResult;
 	};
 }// namespace gal::ini::impl
