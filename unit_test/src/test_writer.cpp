@@ -52,8 +52,14 @@ namespace
 
 	suite test_ini_writer_group_writer = []
 	{
+#ifdef GAL_INI_COMPILER_APPLE_CLANG
+		auto  workaround_extract_result_data = IniExtractor::extract_from_file(TEST_INI_WRITER_FILE_PATH);
+		auto& extract_result				 = workaround_extract_result_data.first;
+		auto& data							 = workaround_extract_result_data.second;
+#else
 		auto [extract_result, data] = IniExtractor::extract_from_file(TEST_INI_WRITER_FILE_PATH);
-		"extract_ok"_test			= [extract_result]
+#endif
+		"extract_ok"_test = [extract_result]
 		{
 			expect((extract_result == FileExtractResult::SUCCESS) >> fatal);
 		};
@@ -355,9 +361,15 @@ namespace
 
 	suite test_ini_writer_group_flusher = []
 	{
-		// read file again
+	// read file again
+#ifdef GAL_INI_COMPILER_APPLE_CLANG
+		auto  workaround_extract_result_data = IniExtractor::extract_from_file(TEST_INI_WRITER_FILE_PATH);
+		auto& extract_result				 = workaround_extract_result_data.first;
+		auto& data							 = workaround_extract_result_data.second;
+#else
 		auto [extract_result, data] = IniExtractor::extract_from_file(TEST_INI_WRITER_FILE_PATH);
-		"extract_ok"_test			= [extract_result]
+#endif
+		"extract_ok"_test = [extract_result]
 		{
 			expect((extract_result == FileExtractResult::SUCCESS) >> fatal);
 		};

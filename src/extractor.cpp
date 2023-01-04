@@ -10,6 +10,7 @@
 #include <lexy/input/string_input.hpp>
 #include <lexy_ext/report_error.hpp>
 #include <memory>
+#include <utility>
 
 //#define GAL_INI_TRACE_PARSE
 

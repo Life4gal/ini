@@ -177,10 +177,17 @@ namespace
 			  writer_{nullptr},
 			  last_comment_{ini::make_comment_view(ini::CommentIndication::INVALID, {})}
 		{
+#if defined(GAL_INI_COMPILER_APPLE_CLANG)
+			for (const auto& [group_name, _]: context_)
+			{
+				pending_flush_group_.insert(group_name);
+			}
+#else
 			for (const auto& group_name: context_ | std::views::keys)
 			{
 				pending_flush_group_.insert(group_name);
 			}
+#endif
 		}
 
 		FlusherState(const FlusherState&)					 = delete;
@@ -322,10 +329,17 @@ namespace
 			  context_{context},
 			  writer_{nullptr}
 		{
+#if defined(GAL_INI_COMPILER_APPLE_CLANG)
+			for (const auto& [group_name, _]: context_)
+			{
+				pending_flush_group_.insert(group_name);
+			}
+#else
 			for (const auto& group_name: context_ | std::views::keys)
 			{
 				pending_flush_group_.insert(group_name);
 			}
+#endif
 		}
 
 		FlusherStateWithComment(const FlusherStateWithComment&)					   = delete;
