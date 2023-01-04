@@ -18,7 +18,7 @@ namespace
 	{
 		const std::filesystem::path file_path{TEST_INI_READER_FILE_PATH};
 
-		std::ofstream file{file_path, std::ios::out | std::ios::trunc};
+		std::ofstream				file{file_path, std::ios::out | std::ios::trunc};
 
 		file << "[" GROUP1_NAME << "]\n";
 		file << "key1=value1\n";
@@ -49,9 +49,16 @@ namespace
 
 	suite test_ini_reader_group_reader = []
 	{
-		IniParser parser{TEST_INI_READER_FILE_PATH};
+		auto [extract_result, data] = IniExtractor::extract_from_file(TEST_INI_READER_FILE_PATH);
+		"extract_ok"_test			= [extract_result]
+		{
+			expect((extract_result == FileExtractResult::SUCCESS) >> fatal);
+		};
 
-		"group_size"_test = [&] { expect((parser.size() == 5_i) >> fatal); };
+		IniManager parser{data};
+
+		"group_size"_test = [&]
+		{ expect((parser.size() == 5_i) >> fatal); };
 
 		"group_name"_test = [&]
 		{
@@ -129,9 +136,16 @@ namespace
 
 	suite test_ini_reader_group_modifier = []
 	{
-		IniParser parser{TEST_INI_READER_FILE_PATH};
+		auto [extract_result, data] = IniExtractor::extract_from_file(TEST_INI_READER_FILE_PATH);
+		"extract_ok"_test			= [extract_result]
+		{
+			expect((extract_result == FileExtractResult::SUCCESS) >> fatal);
+		};
 
-		"group_size"_test = [&] { expect((parser.size() == 5_i) >> fatal); };
+		IniManager parser{data};
+
+		"group_size"_test = [&]
+		{ expect((parser.size() == 5_i) >> fatal); };
 
 		"group_name"_test = [&]
 		{
@@ -293,7 +307,7 @@ namespace
 
 			"add_key5"_test = [&]
 			{
-				const auto& [result,key, value] = writer.try_insert(
+				const auto& [result, key, value] = writer.try_insert(
 						"key5",
 						"value5");
 
@@ -329,7 +343,8 @@ namespace
 				expect((writer.get("key4") == "value4") >> fatal);
 			};
 
-			"remove_key3"_test = [&] { expect((writer.remove("key3") == "removed"_b) >> fatal); };
+			"remove_key3"_test = [&]
+			{ expect((writer.remove("key3") == "removed"_b) >> fatal); };
 
 			"check_remove_key3"_test = [&]
 			{
@@ -339,7 +354,7 @@ namespace
 
 			"extract_key5_and_insert_back"_test = [&]
 			{
-				auto&& node = writer.extract("key5");
+				auto&& node					 = writer.extract("key5");
 
 				"check_key5_not_exists"_test = [&]
 				{
@@ -347,8 +362,8 @@ namespace
 					expect((writer.contains("key5") != "key5 exists"_b) >> fatal);
 				};
 
-				auto& [key, value] = node;
-				value              = "new value5";
+				auto& [key, value]		= node;
+				value					= "new value5";
 
 				"insert_key5_back"_test = [&]
 				{
@@ -368,7 +383,7 @@ namespace
 
 			"extract_key1_and_assign"_test = [&]
 			{
-				auto&& node = writer.extract("key1");
+				auto&& node					 = writer.extract("key1");
 
 				"check_key1_not_exists"_test = [&]
 				{
@@ -388,8 +403,8 @@ namespace
 					expect((value == "new value1") >> fatal);
 				};
 
-				auto& [key, value] = node;
-				value              = "old value1";
+				auto& [key, value]		= node;
+				value					= "old value1";
 
 				"insert_key1_back"_test = [&]
 				{
@@ -410,4 +425,4 @@ namespace
 			};
 		};
 	};
-}
+}// namespace

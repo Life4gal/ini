@@ -10,12 +10,26 @@ auto main() -> int
 			  << '\n';
 
 	std::cout << "=== unordered parser ===\n";
-	const gal::ini::IniParser ini{"test.ini"};
-	ini.print(std::cout);
+	{
+		const auto [result, data] = gal::ini::IniExtractor::extract_from_file("test.ini");
+		if (result != gal::ini::impl::FileExtractResult::SUCCESS)
+		{
+			std::cout << "Error: " << static_cast<int>(result);
+		}
+		gal::ini::IniFlusher flusher{data};
+		flusher.flush(std::cout);
+	}
 
 	std::cout << "\n\n";
 
 	std::cout << "=== unordered parser with comment ===\n";
-	const gal::ini::IniParserWithComment ini_with_comment{"test.ini"};
-	ini_with_comment.print(std::cout);
+	{
+		const auto [result, data] = gal::ini::IniExtractorWithComment::extract_from_file("test.ini");
+		if (result != gal::ini::impl::FileExtractResult::SUCCESS)
+		{
+			std::cout << "Error: " << static_cast<int>(result);
+		}
+		gal::ini::IniFlusherWithComment flusher{data};
+		flusher.flush(std::cout);
+	}
 }

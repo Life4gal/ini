@@ -18,7 +18,7 @@ namespace
 	{
 		const std::filesystem::path file_path{TEST_INI_READER_WITH_COMMENT_FILE_PATH};
 
-		std::ofstream file{file_path, std::ios::out | std::ios::trunc};
+		std::ofstream				file{file_path, std::ios::out | std::ios::trunc};
 
 		file << "[" GROUP1_NAME << "]\n";
 		file << "key1=value1\n";
@@ -52,9 +52,16 @@ namespace
 
 	suite test_ini_reader_with_comment_group_reader = []
 	{
-		IniParserWithComment parser{TEST_INI_READER_WITH_COMMENT_FILE_PATH};
+		auto [extract_result, data] = IniExtractorWithComment::extract_from_file(TEST_INI_READER_WITH_COMMENT_FILE_PATH);
+		"extract_ok"_test			= [extract_result]
+		{
+			expect((extract_result == FileExtractResult::SUCCESS) >> fatal);
+		};
 
-		"group_size"_test = [&] { expect((parser.size() == 5_i) >> fatal); };
+		IniManagerWithComment parser{data};
+
+		"group_size"_test = [&]
+		{ expect((parser.size() == 5_i) >> fatal); };
 
 		"group_name"_test = [&]
 		{
@@ -165,9 +172,16 @@ namespace
 
 	suite test_ini_reader_with_comment_group_modifier = []
 	{
-		IniParserWithComment parser{TEST_INI_READER_WITH_COMMENT_FILE_PATH};
+		auto [extract_result, data] = IniExtractorWithComment::extract_from_file(TEST_INI_READER_WITH_COMMENT_FILE_PATH);
+		"extract_ok"_test			= [extract_result]
+		{
+			expect((extract_result == FileExtractResult::SUCCESS) >> fatal);
+		};
 
-		"group_size"_test = [&] { expect((parser.size() == 5_i) >> fatal); };
+		IniManagerWithComment parser{data};
+
+		"group_size"_test = [&]
+		{ expect((parser.size() == 5_i) >> fatal); };
 
 		"group_name"_test = [&]
 		{
@@ -456,7 +470,8 @@ namespace
 				expect((writer.has_inline_comment("key4") == "key4 has inline comment"_b) >> fatal);
 			};
 
-			"remove_key3"_test = [&] { expect((writer.remove("key3") == "removed"_b) >> fatal); };
+			"remove_key3"_test = [&]
+			{ expect((writer.remove("key3") == "removed"_b) >> fatal); };
 
 			"check_remove_key3"_test = [&]
 			{
@@ -466,7 +481,7 @@ namespace
 
 			"extract_key5_and_insert_back"_test = [&]
 			{
-				auto&& node = writer.extract("key5");
+				auto&& node					 = writer.extract("key5");
 
 				"check_key5_not_exists"_test = [&]
 				{
@@ -475,10 +490,10 @@ namespace
 				};
 
 				auto& [comment, key, value, inline_comment] = node;
-				comment                                     = make_comment(CommentIndication::HASH_SIGN, "key5 comment");
-				value                                       = "new value5";
+				comment										= make_comment(CommentIndication::HASH_SIGN, "key5 comment");
+				value										= "new value5";
 
-				"insert_key5_back"_test = [&]
+				"insert_key5_back"_test						= [&]
 				{
 					const auto& [result, result_comment, result_key, result_value, result_inline_comment] = writer.try_insert(std::move(node));
 
@@ -500,7 +515,7 @@ namespace
 
 			"extract_key1_and_assign"_test = [&]
 			{
-				auto&& node = writer.extract("key1");
+				auto&& node					 = writer.extract("key1");
 
 				"check_key1_not_exists"_test = [&]
 				{
@@ -528,10 +543,10 @@ namespace
 				};
 
 				auto& [comment, key, value, inline_comment] = node;
-				comment                                     = make_comment(CommentIndication::HASH_SIGN, "key5 new comment");
-				inline_comment                              = {};
+				comment										= make_comment(CommentIndication::HASH_SIGN, "key5 new comment");
+				inline_comment								= {};
 
-				"insert_key1_back"_test = [&]
+				"insert_key1_back"_test						= [&]
 				{
 					const auto& [inserted, inserted_comment, inserted_key, inserted_value, inserted_inline_comment] = writer.insert_or_assign(std::move(node));
 
@@ -557,4 +572,4 @@ namespace
 			};
 		};
 	};
-}
+}// namespace
