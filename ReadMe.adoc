@@ -17,9 +17,10 @@ Life4gal <Life4gal@gmail.com>
 The front-end implementation of the parser is based on the https://github.com/foonathan/lexy[lexy] implementation.
 
 == Usage
-[source, c++]
-----
-include::unit_test/src/test_writer_with_comment.cpp[]
-----
+https://github.com/Life4gal/ini/blob/c380ac56f6bbc41f2890b36a6a4251329188fe61/unit_test/src/test_writer_with_comment.cpp#L472-L639
+// [source, c++]
+// ----
+// include::unit_test/src/test_writer_with_comment.cpp[]
+// ----
 
 == License
