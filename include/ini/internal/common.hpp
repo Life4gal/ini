@@ -410,4 +410,61 @@ namespace gal::ini
 	template<typename String>
 	constexpr auto comment_indication_semicolon = common::make_comment_indication<typename string_view_t<String>::value_type, CommentIndication::SEMICOLON>();
 
+	template<typename T>
+	class StackFunction;
+
+	namespace common
+	{
+		template<typename T>
+		struct is_stack_function : std::false_type
+		{
+		};
+
+		template<typename T>
+		struct is_stack_function<StackFunction<T>> : std::true_type
+		{
+		};
+
+		template<typename T>
+		constexpr static bool is_stack_function_v = is_stack_function<T>::value;
+	}// namespace common
+
+	template<typename Return, typename... Args>
+	class StackFunction<Return(Args...)>
+	{
+		using result_type  = Return;
+
+		using invoker_type = auto (*)(const char*, Args&&...) -> result_type;
+
+	private:
+		invoker_type invoker_;
+		const char*	 data_;
+
+		template<typename Functor>
+		[[nodiscard]] constexpr static auto do_invoke(Functor* functor, Args&&... args) noexcept(noexcept((*functor)(std::forward<Args>(args)...)))
+				-> result_type
+		{
+			return (*functor)(std::forward<Args>(args)...);
+		}
+
+	public:
+		// really?
+		constexpr StackFunction() noexcept
+			: invoker_{nullptr},
+			  data_{nullptr} {}
+
+		template<typename Functor>
+			requires(!common::is_stack_function_v<Functor>)
+		constexpr explicit(false) StackFunction(const Functor& functor) noexcept
+			: invoker_{reinterpret_cast<invoker_type>(do_invoke<Functor>)},
+			  data_{reinterpret_cast<const char*>(&functor)}
+		{
+		}
+
+		constexpr auto operator()(Args... args) noexcept(noexcept(invoker_(data_, std::forward<Args>(args)...))) -> result_type
+		{
+			// !!!no nullptr check!!!
+			return invoker_(data_, std::forward<Args>(args)...);
+		}
+	};
 }// namespace gal::ini

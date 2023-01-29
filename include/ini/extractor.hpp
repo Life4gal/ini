@@ -75,64 +75,6 @@ namespace gal::ini
 	using string_32_type = std::span<ini_char32>;
 #endif
 
-	namespace extractor_detail
-	{
-		template<typename T>
-		class StackFunction;
-
-		template<typename T>
-		struct is_stack_function : std::false_type
-		{
-		};
-
-		template<typename T>
-		struct is_stack_function<StackFunction<T>> : std::true_type
-		{
-		};
-
-		template<typename T>
-		constexpr static bool is_stack_function_v = is_stack_function<T>::value;
-
-		template<typename Return, typename... Args>
-		class StackFunction<Return(Args...)>
-		{
-			using result_type  = Return;
-
-			using invoker_type = auto (*)(const char*, Args&&...) -> result_type;
-
-		private:
-			invoker_type invoker_;
-			const char*	 data_;
-
-			template<typename Functor>
-			[[nodiscard]] constexpr static auto do_invoke(Functor* functor, Args&&... args) noexcept(noexcept((*functor)(std::forward<Args>(args)...)))
-					-> result_type
-			{
-				return (*functor)(std::forward<Args>(args)...);
-			}
-
-		public:
-			// really?
-			constexpr StackFunction() noexcept
-				: invoker_{nullptr},
-				  data_{nullptr} {}
-
-			template<typename Functor>
-				requires(!is_stack_function_v<Functor>)
-			constexpr explicit(false) StackFunction(const Functor& functor) noexcept
-				: invoker_{reinterpret_cast<invoker_type>(do_invoke<Functor>)},
-				  data_{reinterpret_cast<const char*>(&functor)}
-			{
-			}
-
-			constexpr auto operator()(Args... args) noexcept(noexcept(invoker_(data_, std::forward<Args>(args)...))) -> result_type
-			{
-				// !!!no nullptr check!!!
-				return invoker_(data_, std::forward<Args>(args)...);
-			}
-		};
-	}// namespace extractor_detail
-
 #if defined(GAL_INI_STD_STRING)
 	using string_std_type	= std::basic_string<char>;
 	using string_stdw_type	= std::basic_string<wchar_t>;
@@ -201,7 +143,7 @@ namespace gal::ini
 
 	template<typename Char>
 	using kv_append_type =
-			extractor_detail::StackFunction<
+			StackFunction<
 					auto
 					// pass new key, new value
 					(std::basic_string_view<Char>, std::basic_string_view<Char>)
@@ -221,7 +163,7 @@ namespace gal::ini
 
 	template<typename Char>
 	using group_append_type =
-			extractor_detail::StackFunction<
+			StackFunction<
 					auto
 					// pass new group name
 					(std::basic_string_view<Char> group_name)
