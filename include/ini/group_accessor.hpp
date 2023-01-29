@@ -68,45 +68,6 @@ namespace gal::ini
 		};
 
 		template<typename T>
-		class StackFunction;
-
-		template<typename Return, typename... Args>
-		class StackFunction<Return(Args...)>
-		{
-			using result_type  = Return;
-
-			using invoker_type = auto (*)(const char*, Args&&...) -> result_type;
-
-		private:
-			invoker_type invoker_;
-			const char*	 data_;
-
-			template<typename Functor>
-			[[nodiscard]] constexpr static auto do_invoke(Functor* functor, Args&&... args) noexcept(noexcept((*functor)(std::forward<Args>(args)...)))
-					-> result_type
-			{
-				return (*functor)(std::forward<Args>(args)...);
-			}
-
-		public:
-			constexpr StackFunction() noexcept
-				: invoker_{nullptr},
-				  data_{nullptr} {}
-
-			template<typename Functor>
-			constexpr explicit(false) StackFunction(const Functor& functor) noexcept
-				: invoker_{reinterpret_cast<invoker_type>(do_invoke<Functor>)},
-				  data_{reinterpret_cast<const char*>(&functor)}
-			{
-			}
-
-			constexpr auto operator()(Args&&... args) noexcept(noexcept(invoker_(data_, std::forward<Args>(args)...))) -> result_type
-			{
-				return invoker_(data_, std::forward<Args>(args)...);
-			}
-		};
-
-		template<typename T>
 		struct map_allocator_type;
 
 		template<
