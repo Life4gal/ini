@@ -307,14 +307,107 @@ namespace gal::ini
 		}
 	}
 
+	enum class CommentIndication
+	{
+		INVALID,
+
+		HASH_SIGN = '#',
+		SEMICOLON = ';',
+	};
+
+	template<typename Char, CommentIndication Indication>
+	[[nodiscard]] consteval auto make_comment_indication() noexcept
+	{
+		if constexpr (std::is_same_v<Char, wchar_t>)
+		{
+			if constexpr (Indication == CommentIndication::HASH_SIGN)
+			{
+				return L'#';
+			}
+			else if constexpr (Indication == CommentIndication::SEMICOLON)
+			{
+				return L';';
+			}
+			else
+			{
+				GAL_INI_UNREACHABLE();
+			}
+		}
+		else if constexpr (std::is_same_v<Char, char8_t>)
+		{
+			if constexpr (Indication == CommentIndication::HASH_SIGN)
+			{
+				return u8'#';
+			}
+			else if constexpr (Indication == CommentIndication::SEMICOLON)
+			{
+				return u8';';
+			}
+			else
+			{
+				GAL_INI_UNREACHABLE();
+			}
+		}
+		else if constexpr (std::is_same_v<Char, char16_t>)
+		{
+			if constexpr (Indication == CommentIndication::HASH_SIGN)
+			{
+				return u'#';
+			}
+			else if constexpr (Indication == CommentIndication::SEMICOLON)
+			{
+				return u';';
+			}
+			else
+			{
+				GAL_INI_UNREACHABLE();
+			}
+		}
+		else if constexpr (std::is_same_v<Char, char32_t>)
+		{
+			if constexpr (Indication == CommentIndication::HASH_SIGN)
+			{
+				return U'#';
+			}
+			else if constexpr (Indication == CommentIndication::SEMICOLON)
+			{
+				return U';';
+			}
+			else
+			{
+				GAL_INI_UNREACHABLE();
+			}
+		}
+		else
+		{
+			if constexpr (Indication == CommentIndication::HASH_SIGN)
+			{
+				return '#';
+			}
+			else if constexpr (Indication == CommentIndication::SEMICOLON)
+			{
+				return ';';
+			}
+			else
+			{
+				GAL_INI_UNREACHABLE();
+			}
+		}
+	}
+
 	template<typename String>
-	constexpr auto line_separator = make_line_separator<string_view_t<String>::value_type>();
+	constexpr auto line_separator = make_line_separator<typename string_view_t<String>::value_type>();
 	template<typename String>
-	constexpr auto kv_separator = make_kv_separator<string_view_t<String>::value_type>();
+	constexpr auto kv_separator = make_kv_separator<typename string_view_t<String>::value_type>();
 	template<typename String>
-	constexpr auto blank_separator = make_blank_separator<string_view_t<String>::value_type>();
+	constexpr auto blank_separator = make_blank_separator<typename string_view_t<String>::value_type>();
 	template<typename String>
-	constexpr auto square_bracket = make_square_bracket<string_view_t<String>::value_type>();
+	constexpr auto square_bracket = make_square_bracket<typename string_view_t<String>::value_type>();
+
+	template<typename String>
+	constexpr auto comment_indication_hash_sign = make_comment_indication<typename string_view_t<String>::value_type, CommentIndication::HASH_SIGN>();
+	template<typename String>
+	constexpr auto comment_indication_semicolon = make_comment_indication<typename string_view_t<String>::value_type, CommentIndication::SEMICOLON>();
 
 	namespace group_accessor_detail
 	{
