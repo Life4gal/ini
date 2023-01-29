@@ -1,7 +1,11 @@
 #pragma once
 
 #include <memory>
+#include <string_view>
 #include <type_traits>
+
+// For Flusher
+//#include <unordered_map>
 
 #if defined(GAL_INI_COMPILER_MSVC)
 	#define GAL_INI_UNREACHABLE() __assume(0)
@@ -100,13 +104,172 @@ namespace gal::ini
 				return invoker_(data_, std::forward<Args>(args)...);
 			}
 		};
+
+		template<typename T>
+		struct map_type;
+
+		template<template<typename, typename, typename, typename...> typename Map, typename Key, typename Value, typename Hash, typename... NeverMind>
+		struct map_type<Map<Key, Value, Hash, NeverMind...>>
+		{
+			using key_type	  = Key;
+			using mapped_type = Value;
+			using hash_type	  = Hash;
+
+			template<typename NewKey, typename NewValue, typename NewHash>
+			using type = Map<NewKey, NewValue, NewHash, NeverMind...>;
+		};
+
+		template<typename T, typename NewKey, typename NewValue, typename NewHash>
+		using map_type_t = map_type<T>::template type<NewKey, NewValue, NewHash>;
 	}// namespace group_accessor_detail
 
 	template<typename String>
 	using string_view_t = std::basic_string_view<group_accessor_detail::char_type_t<String>, group_accessor_detail::char_traits_t<String>>;
 
+	template<typename Char>
+	[[nodiscard]] consteval auto make_line_separator() noexcept
+	{
+		if constexpr (std::is_same_v<Char, wchar_t>)
+		{
+#ifdef GAL_INI_PLATFORM_WINDOWS
+			return L"\n";
+#else
+			return L"\r\n";
+#endif
+		}
+		else if constexpr (std::is_same_v<Char, char8_t>)
+		{
+#ifdef GAL_INI_PLATFORM_WINDOWS
+			return u8"\n";
+#else
+			return u8"\r\n";
+#endif
+		}
+		else if constexpr (std::is_same_v<Char, char16_t>)
+		{
+#ifdef GAL_INI_PLATFORM_WINDOWS
+			return u"\n";
+#else
+			return u"\r\n";
+#endif
+		}
+		else if constexpr (std::is_same_v<Char, char32_t>)
+		{
+#ifdef GAL_INI_PLATFORM_WINDOWS
+			return U"\n";
+#else
+			return U"\r\n";
+#endif
+		}
+		else
+		{
+#ifdef GAL_INI_PLATFORM_WINDOWS
+			return "\n";
+#else
+			return "\r\n";
+#endif
+		}
+	}
+
+	template<typename Char>
+	[[nodiscard]] consteval auto make_kv_separator() noexcept
+	{
+		if constexpr (std::is_same_v<Char, wchar_t>)
+		{
+			return L"=";
+		}
+		else if constexpr (std::is_same_v<Char, char8_t>)
+		{
+			return u8"=";
+		}
+		else if constexpr (std::is_same_v<Char, char16_t>)
+		{
+			return u"=";
+		}
+		else if constexpr (std::is_same_v<Char, char32_t>)
+		{
+			return U"=";
+		}
+		else
+		{
+			return "=";
+		}
+	}
+
+	template<typename Char>
+	[[nodiscard]] consteval auto make_blank_separator() noexcept
+	{
+		if constexpr (std::is_same_v<Char, wchar_t>)
+		{
+			return L" ";
+		}
+		else if constexpr (std::is_same_v<Char, char8_t>)
+		{
+			return u8" ";
+		}
+		else if constexpr (std::is_same_v<Char, char16_t>)
+		{
+			return u" ";
+		}
+		else if constexpr (std::is_same_v<Char, char32_t>)
+		{
+			return U" ";
+		}
+		else
+		{
+			return " ";
+		}
+	}
+
+	template<typename Char>
+	[[nodiscard]] consteval auto make_square_bracket() noexcept
+	{
+		if constexpr (std::is_same_v<Char, wchar_t>)
+		{
+			return std::pair{L'[', L']'};
+		}
+		else if constexpr (std::is_same_v<Char, char8_t>)
+		{
+			return std::pair{u8'[', u8']'};
+		}
+		else if constexpr (std::is_same_v<Char, char16_t>)
+		{
+			return std::pair{u'[', u']'};
+		}
+		else if constexpr (std::is_same_v<Char, char32_t>)
+		{
+			return std::pair{U'[', U']'};
+		}
+		else
+		{
+			return std::pair{'[', ']'};
+		}
+	}
+
+	template<typename String>
+	constexpr auto line_separator = make_line_separator<string_view_t<String>::value_type>();
+	template<typename String>
+	constexpr auto kv_separator = make_kv_separator<string_view_t<String>::value_type>();
+	template<typename String>
+	constexpr auto blank_separator = make_blank_separator<string_view_t<String>::value_type>();
+	template<typename String>
+	constexpr auto square_bracket = make_square_bracket<string_view_t<String>::value_type>();
+
 	namespace group_accessor_detail
 	{
+		template<typename String>
+		struct string_hash_type
+		{
+			using is_transparent   = int;
+
+			using string_type	   = String;
+			using string_view_type = string_view_t<String>;
+
+			[[nodiscard]] auto operator()(const string_type& string) const noexcept -> std::size_t { return std::hash<string_type>{}(string); }
+
+			[[nodiscard]] auto operator()(const string_view_type& string) const noexcept -> std::size_t { return std::hash<string_view_type>{}(string); }
+		};
+
 		template<typename Table, typename String>
 		struct table_finder
 		{
@@ -609,6 +772,118 @@ namespace gal::ini
 		constexpr auto extract(const key_view_type key) -> node_type
 		{
 			return node_type{table_modifier_type::extract(propagate_rep(), key)};
+		}
+	};
+
+	template<typename GroupType>
+	class Flusher
+	{
+		using reader_type = Reader<GroupType>;
+
+	public:
+		using group_type	   = reader_type::group_type;
+
+		using key_type		   = reader_type::key_type;
+		using key_view_type	   = reader_type::key_view_type;
+		using mapped_type	   = reader_type::mapped_type;
+		using mapped_view_type = reader_type::mapped_view_type;
+
+		using name_type		   = reader_type::name_type;
+
+	private:
+		name_type name_;
+
+		// using list_type			= std::unordered_map<string_view_t<key_type>, std::reference_wrapper<mapped_type>, group_accessor_detail::string_hash_type<key_type>, std::equal_to<>>;
+		using list_type			= group_accessor_detail::map_type_t<group_type, string_view_t<key_type>, std::reference_wrapper<mapped_type>, group_accessor_detail::string_hash_type<key_type>>;
+		using table_finder_type = group_accessor_detail::table_finder<list_type, key_type>;
+
+		list_type list_;
+
+	public:
+		constexpr Flusher(const name_type name, const group_type& group) noexcept
+			: name_{name}
+		{
+			for (const auto& kv: group)
+			{
+				list_.emplace(kv.first, kv.second);
+			}
+		}
+
+		/**
+		 * @brief Get the name of the group.
+		 * @return The name of the group.
+		 */
+		[[nodiscard]] constexpr auto name() const noexcept -> name_type { return name_; }
+
+		/**
+		 * @brief Get whether the group is empty.
+		 * @return The group is empty or not.
+		 */
+		[[nodiscard]] constexpr auto empty() const noexcept -> bool { return list_.empty(); }
+
+		/**
+		 * @brief Get the number of values in the group.
+		 * @return The number of values in the group.
+		 */
+		[[nodiscard]] constexpr auto size() const noexcept -> list_type::size_type { return list_.size(); }
+
+		/**
+		 * @brief Check whether the group contains the key.
+		 * @param key The key to find.
+		 * @return The group contains the key or not.
+		 */
+		[[nodiscard]] constexpr auto contains(const key_view_type key) const -> bool { return list_.contains(key); }
+
+		/**
+		 * @brief Get the value corresponding to the key in the group. If the key does not exist, return empty value.
+		 * @param key The key to find.
+		 * @return The value corresponding to the key.
+		 */
+		[[nodiscard]] constexpr auto get(const key_view_type key) const -> mapped_view_type
+		{
+			if (const auto it = list_.find(key);
+				it != list_.end())
+			{
+				return it->second;
+			}
+
+			return {};
+		}
+
+		/**
+		 * @brief Write the key-value pair corresponding to the key into out. (Or do nothing if it not exist).
+		 * @param key The key of the pair.
+		 * @param out The destination.
+		 * @note This does not write line_separator, as it can not determine if there are trailing inline comment.
+		 */
+		template<typename Out>
+			requires requires(Out& out) {
+						 out << std::declval<key_view_type>() << kv_separator<key_type> << line_separator<key_type>;
+					 }
+		auto flush(key_view_type key, Out& out) -> Out&
+		{
+			if (const auto it = list_.find(key);
+				it != list_.end())
+			{
+				out << it->first << kv_separator<key_type> << it->second;
+				list_.erase(it);
+			}
+			return out;
+		}
+
+		/**
+		 * @brief Write all remaining key-value pairs to out.(no longer considers if there are comments)
+		 * @param out The destination.
+		 */
+		template<typename Out>
+			requires requires(Out& out) {
+						 out << std::declval<key_view_type>() << kv_separator<key_type> << line_separator<key_type>;
+					 }
+		auto flush_remainder(Out& out) -> Out&
+		{
+			for (const auto& [key, value]: list_) { out << key << kv_separator<key_type> << value << line_separator<key_type>; }
+			list_.clear();
+			return out;
 		}
 	};
 }// namespace gal::ini
