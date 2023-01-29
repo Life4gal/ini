@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string_view>
+#include <tuple>
 #include <type_traits>
 
 // For Flusher
@@ -106,21 +107,120 @@ namespace gal::ini
 		};
 
 		template<typename T>
-		struct map_type;
+		struct map_allocator_type;
 
-		template<template<typename, typename, typename, typename...> typename Map, typename Key, typename Value, typename Hash, typename... NeverMind>
-		struct map_type<Map<Key, Value, Hash, NeverMind...>>
+		template<
+				template<typename>
+				typename Allocator,
+				typename Key,
+				typename Value>
+		struct map_allocator_type<Allocator<std::pair<const Key, Value>>>
 		{
-			using key_type	  = Key;
-			using mapped_type = Value;
-			using hash_type	  = Hash;
-
-			template<typename NewKey, typename NewValue, typename NewHash>
-			using type = Map<NewKey, NewValue, NewHash, NeverMind...>;
+			template<typename NewKey, typename NewValue>
+			using type = Allocator<std::pair<const NewKey, NewValue>>;
 		};
 
-		template<typename T, typename NewKey, typename NewValue, typename NewHash>
-		using map_type_t = map_type<T>::template type<NewKey, NewValue, NewHash>;
+		template<
+				template<typename>
+				typename Allocator,
+				typename Key,
+				typename Value>
+		// There may be implementations of map that do not require the Key to be const. :)
+		struct map_allocator_type<Allocator<std::pair<Key, Value>>>
+		{
+			template<typename NewKey, typename NewValue>
+			using type = Allocator<std::pair<NewKey, NewValue>>;
+		};
+
+		template<
+				template<typename>
+				typename Allocator,
+				template<typename, typename>
+				typename Pair,
+				typename Key,
+				typename Value>
+		struct map_allocator_type<Allocator<Pair<const Key, Value>>>
+		{
+			template<typename NewKey, typename NewValue>
+			using type = Allocator<Pair<const NewKey, NewValue>>;
+		};
+
+		template<
+				template<typename>
+				typename Allocator,
+				template<typename, typename>
+				typename Pair,
+				typename Key,
+				typename Value>
+		// There may be implementations of map that do not require the Key to be const. :)
+		struct map_allocator_type<Allocator<Pair<Key, Value>>>
+		{
+			template<typename NewKey, typename NewValue>
+			using type = Allocator<Pair<NewKey, NewValue>>;
+		};
+
+		template<typename T, typename NewKey, typename NewValue>
+		using map_allocator_type_t = map_allocator_type<T>::template type<NewKey, NewValue>;
+
+		template<typename T>
+		struct map_type;
+
+		template<
+				template<typename, typename, typename, typename, typename, typename...>
+				typename Map,
+				typename Key,
+				typename Value,
+				typename Hash,
+				typename KeyComparator,
+				typename Allocator,
+				typename... NeverMind>
+		struct map_type<Map<Key, Value, Hash, KeyComparator, Allocator, NeverMind...>>
+		{
+			template<typename NewKey, typename NewValue, typename NewHash = Hash, typename NewKeyComparator = KeyComparator>
+			using type = Map<NewKey, NewValue, NewHash, NewKeyComparator, map_allocator_type_t<Allocator, NewKey, NewValue>, NeverMind...>;
+		};
+
+		template<
+				template<typename, typename, typename, typename, typename...>
+				typename Map,
+				typename Key,
+				typename Value,
+				typename Hash,
+				typename Allocator,
+				typename... NeverMind>
+		struct map_type<Map<Key, Value, Hash, Allocator, NeverMind...>>
+		{
+			template<typename NewKey, typename NewValue, typename NewHash = Hash>
+			using type = Map<NewKey, NewValue, NewHash, map_allocator_type_t<Allocator, NewKey, NewValue>, NeverMind...>;
+		};
+
+		template<
+				template<typename, typename, typename, typename...>
+				typename Map,
+				typename Key,
+				typename Value,
+				typename Allocator,
+				typename... NeverMind>
+		struct map_type<Map<Key, Value, Allocator, NeverMind...>>
+		{
+			template<typename NewKey, typename NewValue>
+			using type = Map<NewKey, NewValue, map_allocator_type_t<Allocator, NewKey, NewValue>, NeverMind...>;
+		};
+
+		template<
+				template<typename, typename, typename, typename...>
+				typename Map,
+				typename Key,
+				typename Value,
+				typename... NeverMind>
+		struct map_type<Map<Key, Value, NeverMind...>>
+		{
+			template<typename NewKey, typename NewValue>
+			using type = Map<NewKey, NewValue, NeverMind...>;
+		};
+
+		template<typename T, typename... Required>
+		using map_type_t = map_type<T>::template type<Required...>;
 	}// namespace group_accessor_detail
 
 	template<typename String>
@@ -490,7 +590,7 @@ namespace gal::ini
 		{
 			friend Writer;
 
-			using writer_node_type_hack_alias			   = group_type;
+			using writer_hack_alias						   = group_type;
 
 			constexpr static std::size_t max_elements_size = 2;
 
@@ -593,7 +693,7 @@ namespace gal::ini
 		{
 			friend Writer;
 
-			using writer_result_type_hack_alias			   = group_type;
+			using writer_hack_alias						   = group_type;
 
 			constexpr static std::size_t max_elements_size = node_type::max_elements_size + 1;
 
@@ -892,10 +992,14 @@ namespace gal::ini
 // WRITER
 // ===========================
 
+// todo:
+//  GCC11.3: error: redefinition of 'struct std::tuple_size<_Tp>'
+//  GCC12.x: OK
+
 //template<typename GroupType>
 //struct std::tuple_size<typename gal::ini::Writer<GroupType>::node_type>
 template<typename T>
-	requires std::same_as<T, typename gal::ini::Writer<typename T::writer_node_type_hack_alias>>
+	requires std::is_same_v<T, typename gal::ini::Writer<typename T::writer_hack_alias>::node_type>
 struct std::tuple_size<T>
 {
 	constexpr static std::size_t value = T::max_elements_size;
@@ -904,7 +1008,7 @@ struct std::tuple_size<T>
 //template<typename GroupType>
 //struct std::tuple_size<gal::ini::Writer<GroupType>::result_type>
 template<typename T>
-	requires std::same_as<T, typename gal::ini::Writer<typename T::writer_result_type_hack_alias>>
+	requires std::is_same_v<T, typename gal::ini::Writer<typename T::writer_hack_alias>::result_type>
 struct std::tuple_size<T>
 {
 	constexpr static std::size_t value = T::max_elements_size;
@@ -913,7 +1017,7 @@ struct std::tuple_size<T>
 //template<std::size_t Index, typename GroupType>
 //struct std::tuple_element<Index, typename gal::ini::Writer<GroupType>::node_type>
 template<std::size_t Index, typename T>
-	requires std::same_as<T, typename gal::ini::Writer<typename T::writer_node_type_hack_alias>>
+	requires std::is_same_v<T, typename gal::ini::Writer<typename T::writer_hack_alias>::node_type>
 struct std::tuple_element<Index, T>
 {
 	using type = T::template index_type<Index>;
@@ -922,7 +1026,7 @@ struct std::tuple_element<Index, T>
 //template<std::size_t Index, typename GroupType>
 //struct std::tuple_element<Index, typename gal::ini::Writer<GroupType>::result_type>
 template<std::size_t Index, typename T>
-	requires std::same_as<T, typename gal::ini::Writer<typename T::writer_result_type_hack_alias>>
+	requires std::is_same_v<T, typename gal::ini::Writer<typename T::writer_hack_alias>::result_type>
 struct std::tuple_element<Index, T>
 {
 	using type = T::template index_type<Index>;
