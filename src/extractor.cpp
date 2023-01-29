@@ -1,7 +1,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <functional>
-#include <ini/ini.hpp>
+#include <ini/extractor.hpp>
 #include <lexy/action/parse.hpp>
 #include <lexy/action/trace.hpp>
 #include <lexy/callback.hpp>
@@ -12,9 +12,9 @@
 #include <memory>
 #include <utility>
 
-//#define GAL_INI_TRACE_PARSE
+//#define GAL_INI_TRACE_EXTRACT
 
-#ifdef GAL_INI_TRACE_PARSE
+#ifdef GAL_INI_TRACE_EXTRACT
 	#include <lexy/visualize.hpp>
 #endif
 
@@ -25,6 +25,7 @@ namespace
 	template<typename StringType>
 	[[nodiscard]] auto to_char_string(const StringType& string) -> decltype(auto)
 	{
+		// todo: char8_t/char16_t/char32_t
 		if constexpr (std::is_same_v<typename StringType::value_type, char>) { return std::string_view{string.data(), string.size()}; }
 		else { return std::filesystem::path{string.data(), string.data() + string.size()}.string(); }
 	}
@@ -40,18 +41,19 @@ namespace
 				lexy::values);
 	}
 
-	// does not own any of data
-	using buffer_view_type		= lexy::string_input<lexy::utf8_encoding>;
-	using buffer_anchor_type	= lexy::input_location_anchor<buffer_view_type>;
-	using default_encoding		= buffer_view_type::encoding;
-	using default_char_type		= buffer_view_type::char_type;
-	using default_position_type = const default_char_type*;
-	static_assert(std::is_same_v<buffer_anchor_type::iterator, default_position_type>);
+	using file_path_type = std::string_view;
 
-	using file_path_type = ini::string_view_type;
-
+	template<typename Encoding>
 	struct buffer_descriptor
 	{
+		// does not own any of data
+		using buffer_view_type		= lexy::string_input<Encoding>;
+		using buffer_anchor_type	= lexy::input_location_anchor<buffer_view_type>;
+		using default_encoding		= buffer_view_type::encoding;
+		using default_char_type		= buffer_view_type::char_type;
+		using default_position_type = const default_char_type*;
+		static_assert(std::is_same_v<typename buffer_anchor_type::iterator, default_position_type>);
+
 		buffer_view_type   buffer;
 		buffer_anchor_type anchor;
 		file_path_type	   file_path;
@@ -62,13 +64,14 @@ namespace
 	public:
 		constexpr static file_path_type buffer_file_path{"anonymous buffer"};
 
-		static auto						report_duplicate_declaration(
-									const buffer_descriptor&		descriptor,
-									const default_char_type*		position,
-									const ini::string_view_type		identifier,
-									const lexy_ext::diagnostic_kind kind,
-									const std::string_view			category,
-									const std::string_view			what_to_do) -> void
+		template<typename Descriptor, typename StringType>
+		static auto report_duplicate_declaration(
+				const Descriptor&								 descriptor,
+				const typename Descriptor::default_position_type position,
+				const StringType&								 identifier,
+				const lexy_ext::diagnostic_kind					 kind,
+				const std::string_view							 category,
+				const std::string_view							 what_to_do) -> void
 		{
 			const auto						  location = lexy::get_input_location(descriptor.buffer, position, descriptor.anchor);
 
@@ -100,30 +103,38 @@ namespace
 		}
 	};
 
+	template<typename Char, typename GroupAppend, typename KvAppend, typename Encoding>
 	class ExtractorState
 	{
 	public:
-		using extractor_type = ini::impl::IniExtractor;
-		using write_type	 = extractor_type::write_type;
-		using group_type	 = extractor_type::group_type;
-		using context_type	 = extractor_type::context_type;
+		using group_append_type		 = GroupAppend;
+		using kv_append_type		 = KvAppend;
+		using encoding				 = Encoding;
+
+		using string_view_type		 = std::basic_string_view<Char>;
+		// todo: for comment
+		using string_type			 = std::basic_string<Char>;
+
+		using buffer_descriptor_type = buffer_descriptor<encoding>;
+		using char_type				 = buffer_descriptor_type::default_char_type;
+		using position_type			 = buffer_descriptor_type::default_position_type;
 
 	private:
-		buffer_descriptor			descriptor_;
+		buffer_descriptor_type descriptor_;
 
-		context_type&				context_;
-		std::unique_ptr<write_type> writer_;
+		group_append_type	   group_appender_;
+		kv_append_type		   kv_appender_;
 
 	public:
 		ExtractorState(
-				const buffer_view_type buffer,
-				const file_path_type   file_path,
-				context_type&		   context)
-			: descriptor_{.buffer = buffer, .anchor = buffer_anchor_type{buffer}, .file_path = file_path},
-			  context_{context},
-			  writer_{nullptr} {}
+				buffer_descriptor_type::buffer_view_type buffer,
+				const file_path_type					 file_path,
+				group_append_type						 group_appender)
+			: descriptor_{buffer, typename buffer_descriptor_type::buffer_anchor_type{buffer}, file_path},
+			  group_appender_{group_appender},
+			  kv_appender_{} {}
 
-		[[nodiscard]] auto buffer() const -> buffer_view_type
+		[[nodiscard]] auto buffer() const -> buffer_descriptor_type::buffer_view_type
 		{
 			return descriptor_.buffer;
 		}
@@ -133,115 +144,35 @@ namespace
 			return descriptor_.file_path;
 		}
 
-		auto begin_group(const default_char_type* position, ini::string_type&& group_name) -> void
+		auto group(const position_type position, const string_view_type group_name) -> void
 		{
-			const auto [it, inserted] = context_.try_emplace(std::move(group_name), group_type{});
+			const auto [name, kv_appender, inserted] = group_appender_(group_name);
+
 			if (!inserted)
 			{
 				ErrorReporter::report_duplicate_declaration(
 						descriptor_,
 						position,
-						it->first,
+						name,
 						lexy_ext::diagnostic_kind::note,
 						"group",
 						"subsequent elements are appended to the previously declared group");
 			}
 
-			writer_ = std::make_unique<write_type>(it->first, it->second);
+			kv_appender_ = kv_appender;
 		}
 
-		auto value(const default_char_type* position, ini::string_type&& key, ini::string_type&& value) -> void
+		auto value(const position_type position, const string_view_type key, const string_view_type value) -> void
 		{
-			// Our parse ensures the writer is valid
-			const auto& [inserted, result_key, result_value] = writer_->try_insert(std::move(key), std::move(value));
-			if (!inserted)
+			// Our parse ensures the kv_appender_ is valid
+			if (
+					const auto& [kv, inserted] = kv_appender_(key, value);
+					!inserted)
 			{
 				ErrorReporter::report_duplicate_declaration(
 						descriptor_,
 						position,
-						result_key,
-						lexy_ext::diagnostic_kind::warning,
-						"variable",
-						"this variable will be discarded");
-			}
-		}
-	};
-
-	class ExtractorStateWithComment
-	{
-	public:
-		using extractor_type = ini::impl::IniExtractorWithComment;
-		using write_type	 = extractor_type::write_type;
-		using group_type	 = extractor_type::group_type;
-		using context_type	 = extractor_type::context_type;
-
-	private:
-		buffer_descriptor			descriptor_;
-
-		context_type&				context_;
-		std::unique_ptr<write_type> writer_;
-
-		ini::comment_type			last_comment_;
-
-	public:
-		ExtractorStateWithComment(
-				const buffer_view_type buffer,
-				const file_path_type   file_path,
-				context_type&		   context)
-			: descriptor_{.buffer = buffer, .anchor = buffer_anchor_type{buffer}, .file_path = file_path},
-			  context_{context},
-			  writer_{nullptr},
-			  last_comment_{ini::make_comment(ini::CommentIndication::INVALID, {})} {}
-
-		[[nodiscard]] auto buffer() const -> buffer_view_type
-		{
-			return descriptor_.buffer;
-		}
-
-		[[nodiscard]] auto file_path() const -> file_path_type
-		{
-			return descriptor_.file_path;
-		}
-
-		auto comment(ini::comment_type&& comment) -> void { last_comment_ = std::move(comment); }
-
-		auto begin_group(const default_char_type* position, ini::string_type&& group_name, ini::comment_type&& inline_comment = {}) -> void
-		{
-			const auto [it, inserted] = context_.try_emplace(std::move(group_name), group_type{});
-			if (!inserted)
-			{
-				ErrorReporter::report_duplicate_declaration(
-						descriptor_,
-						position,
-						it->first,
-						lexy_ext::diagnostic_kind::note,
-						"group",
-						"subsequent elements are appended to the previously declared group");
-			}
-
-			writer_ = std::make_unique<write_type>(it->first, it->second);
-
-			writer_->comment(std::exchange(last_comment_, {}));
-			writer_->inline_comment(std::move(inline_comment));
-		}
-
-		auto value(const default_char_type* position, ini::string_type&& key, ini::string_type&& value, ini::comment_type&& inline_comment = {}) -> void
-		{
-			// Our parse ensures the writer is valid
-			const auto& [inserted,
-						 result_comment,
-						 result_key,
-						 result_value,
-						 result_inline_comment] = writer_->try_insert(std::move(key),
-																	  std::move(value),
-																	  std::exchange(last_comment_, {}),
-																	  std::move(inline_comment));
-			if (!inserted)
-			{
-				ErrorReporter::report_duplicate_declaration(
-						descriptor_,
-						position,
-						result_key,
+						kv.first,
 						lexy_ext::diagnostic_kind::warning,
 						"variable",
 						"this variable will be discarded");
@@ -253,7 +184,7 @@ namespace
 	{
 		namespace dsl = lexy::dsl;
 
-		template<bool Required>
+		template<typename State, bool Required>
 		struct comment_context
 		{
 			[[nodiscard]] consteval static auto name() noexcept -> const char* { return "[comment context]"; }
@@ -268,7 +199,12 @@ namespace
 
 			constexpr static auto value = []
 			{
-				if constexpr (Required) { return lexy::as_string<ini::string_type, default_encoding>; }
+				if constexpr (Required)
+				{
+					// todo
+					// return lexy::as_string<typename State::string_type, typename State::encoding>;
+					return lexy::noop;
+				}
 				else
 				{
 					// ignore it
@@ -277,20 +213,20 @@ namespace
 			}();
 		};
 
-		template<typename ParseState, bool Required, char Indication>
+		template<typename State, bool Required, typename State::char_type Indication>
 		struct comment
 		{
-			[[nodiscard]] consteval static auto name() noexcept -> const char* { return "[comment]"; }
+			[[nodiscard]] consteval static auto		   name() noexcept -> const char* { return "[comment]"; }
 
-			constexpr static char				indication = Indication;
+			constexpr static typename State::char_type indication = Indication;
 
-			constexpr static auto				rule =
+			constexpr static auto					   rule =
 					// begin with hash_sign
 					dsl::lit_c<indication>
 					//
 					>>
 					(LEXY_DEBUG("parse comment begin") +
-					 dsl::p<comment_context<Required>> +
+					 dsl::p<comment_context<State, Required>> +
 					 LEXY_DEBUG("parse comment end") +
 					 dsl::newline);
 
@@ -299,8 +235,12 @@ namespace
 				if constexpr (Required)
 				{
 					return callback<void>(
-							[](ParseState& state, ini::string_type&& context) -> void
-							{ state.comment({.indication = ini::make_comment_indication(indication), .comment = std::move(context)}); });
+							[](State& state, typename State::string_type&& context) -> void
+							{
+								// state.comment({.indication = ini::make_comment_indication(indication), .comment = std::move(context)});
+								(void)state;
+								(void)context;
+							});
 				}
 				else
 				{
@@ -310,31 +250,32 @@ namespace
 			}();
 		};
 
-		template<typename ParseState, bool Required, char Indication>
+		template<typename State, bool Required, typename State::char_type Indication>
 		struct comment_inline
 		{
-			[[nodiscard]] consteval static auto name() noexcept -> const char* { return "[inline comment]"; }
+			[[nodiscard]] consteval static auto		   name() noexcept -> const char* { return "[inline comment]"; }
 
 			// constexpr static char indication = comment<ParseState, Indication>::indication;
-			constexpr static char				indication = Indication;
+			constexpr static typename State::char_type indication = Indication;
 
 			// constexpr static auto rule		 = comment<ParseState, Indication>::rule;
-			constexpr static auto				rule =
+			constexpr static auto					   rule =
 					// begin with hash_sign
 					dsl::lit_c<indication>
 					//
 					>>
 					(LEXY_DEBUG("parse inline_comment begin") +
-					 dsl::p<comment_context<Required>> +
+					 dsl::p<comment_context<State, Required>> +
 					 LEXY_DEBUG("parse inline_comment end"));
 
 			constexpr static auto value = []
 			{
 				if constexpr (Required)
 				{
-					return callback<ini::comment_type>(
-							[]([[maybe_unused]] ParseState& state, ini::string_type&& context) -> ini::comment_type
-							{ return {.indication = ini::make_comment_indication(indication), .comment = std::move(context)}; });
+					// return callback<ini::comment_type>(
+					// 		[]([[maybe_unused]] State& state, typename State::string_type&& context) -> ini::comment_type
+					// 		{ return {.indication = ini::make_comment_indication(indication), .comment = std::move(context)}; });
+					return lexy::noop;
 				}
 				else
 				{
@@ -344,26 +285,27 @@ namespace
 			}();
 		};
 
-		template<typename ParseState, bool Required>
-		using comment_hash_sign = comment<ParseState, Required, make_comment_indication(ini::CommentIndication::HASH_SIGN)>;
-		template<typename ParseState, bool Required>
-		using comment_semicolon = comment<ParseState, Required, make_comment_indication(ini::CommentIndication::SEMICOLON)>;
+		template<typename State, bool Required>
+		using comment_hash_sign = comment<State, Required, ini::comment_indication_hash_sign<typename State::string_type>>;
+		template<typename State, bool Required>
+		using comment_semicolon = comment<State, Required, ini::comment_indication_semicolon<typename State::string_type>>;
 
-		template<typename ParseState, bool Required>
+		template<typename State, bool Required>
 		constexpr auto comment_production =
-				dsl::p<comment_hash_sign<ParseState, Required>> |
-				dsl::p<comment_semicolon<ParseState, Required>>;
+				dsl::p<comment_hash_sign<State, Required>> |
+				dsl::p<comment_semicolon<State, Required>>;
 
-		template<typename ParseState, bool Required>
-		using comment_inline_hash_sign = comment_inline<ParseState, Required, make_comment_indication(ini::CommentIndication::HASH_SIGN)>;
-		template<typename ParseState, bool Required>
-		using comment_inline_semicolon = comment_inline<ParseState, Required, make_comment_indication(ini::CommentIndication::SEMICOLON)>;
+		template<typename State, bool Required>
+		using comment_inline_hash_sign = comment_inline<State, Required, ini::comment_indication_hash_sign<typename State::string_type>>;
+		template<typename State, bool Required>
+		using comment_inline_semicolon = comment_inline<State, Required, ini::comment_indication_semicolon<typename State::string_type>>;
 
-		template<typename ParseState, bool Required>
+		template<typename State, bool Required>
 		constexpr auto comment_inline_production =
-				dsl::p<comment_inline_hash_sign<ParseState, Required>> |
-				dsl::p<comment_inline_semicolon<ParseState, Required>>;
+				dsl::p<comment_inline_hash_sign<State, Required>> |
+				dsl::p<comment_inline_semicolon<State, Required>>;
 
+		template<typename State>
 		struct group_name
 		{
 			[[nodiscard]] consteval static auto name() noexcept -> const char* { return "[group name]"; }
@@ -375,9 +317,10 @@ namespace
 							// continue with printable, but excluding '\r', '\n', '\r\n' and ']'
 							dsl::unicode::print - dsl::unicode::newline - dsl::square_bracketed.close());
 
-			constexpr static auto value = lexy::as_string<ini::string_type, default_encoding>;
+			constexpr static auto value = lexy::as_string<typename State::string_view_type, typename State::encoding>;
 		};
 
+		template<typename State>
 		struct variable_key
 		{
 			[[nodiscard]] consteval static auto name() noexcept -> const char* { return "[key]"; }
@@ -399,9 +342,10 @@ namespace
 					   dsl::error<invalid_key>;
 			}();
 
-			constexpr static auto value = lexy::as_string<ini::string_type, default_encoding>;
+			constexpr static auto value = lexy::as_string<typename State::string_view_type, typename State::encoding>;
 		};
 
+		template<typename State>
 		struct variable_value
 		{
 			[[nodiscard]] consteval static auto name() noexcept -> const char* { return "[value]"; }
@@ -416,11 +360,11 @@ namespace
 				return dsl::peek(begin_with_not_blank) >> dsl::identifier(begin_with_not_blank, continue_with_printable);
 			}();
 
-			constexpr static auto value = lexy::as_string<ini::string_type, default_encoding>;
+			constexpr static auto value = lexy::as_string<typename State::string_view_type, typename State::encoding>;
 		};
 
 		// identifier = [variable]
-		template<typename ParseState, bool CommentRequired>
+		template<typename State, bool CommentRequired>
 		struct variable_declaration
 		{
 		private:
@@ -432,13 +376,13 @@ namespace
 			{
 				constexpr static auto value = callback<void>(
 						// blank line
-						[]([[maybe_unused]] ParseState& state) {},
+						[]([[maybe_unused]] State& state) {},
 						// [identifier] = [variable]
-						[]<typename... Ignore>(ParseState& state, const default_char_type* position, ini::string_type&& key, ini::string_type&& value, [[maybe_unused]] Ignore&&... ignore) -> void
-						{ state.value(position, std::move(key), std::move(value)); },
+						[]<typename... Ignore>(State& state, const typename State::position_type position, const typename State::string_view_type key, const typename State::string_view_type value, [[maybe_unused]] Ignore&&... ignore) -> void
+						{ state.value(position, key, value); },
 						// [identifier] = []
-						[]<typename... Ignore>(ParseState& state, const default_char_type* position, ini::string_type&& key, lexy::nullopt, [[maybe_unused]] Ignore&&... ignore) -> void
-						{ state.value(position, std::move(key), ini::string_type{}); });
+						[]<typename... Ignore>(State& state, const typename State::position_type position, const typename State::string_view_type key, lexy::nullopt, [[maybe_unused]] Ignore&&... ignore) -> void
+						{ state.value(position, key, typename State::string_view_type{}); });
 			};
 
 			template<typename P>
@@ -446,19 +390,19 @@ namespace
 			{
 				constexpr static auto value = callback<void>(
 						// blank line
-						[]([[maybe_unused]] ParseState& state) {},
+						[]([[maybe_unused]] State& state) {},
 						// [identifier] = [variable] [comment]
-						[](ParseState& state, const default_char_type* position, ini::string_type&& key, ini::string_type&& value, ini::comment_type&& comment) -> void
-						{ state.value(position, std::move(key), std::move(value), std::move(comment)); },
+						// [](State& state, const typename State::position_type position, const typename State::string_view_type key, const typename State::string_view_type value, ini::comment_type&& comment) -> void
+						// { state.value(position, key, value, std::move(comment)); },
 						// [identifier] = [] [variable]
-						[](ParseState& state, const default_char_type* position, ini::string_type&& key, ini::string_type&& value, lexy::nullopt) -> void
-						{ state.value(position, std::move(key), std::move(value)); },
+						[](State& state, const typename State::position_type position, const typename State::string_view_type key, const typename State::string_view_type value, lexy::nullopt) -> void
+						{ state.value(position, key, value); },
 						// [identifier] = [] [comment]
-						[](ParseState& state, const default_char_type* position, ini::string_type&& key, lexy::nullopt, ini::comment_type&& comment) -> void
-						{ state.value(position, std::move(key), ini::string_type{}, std::move(comment)); },
+						// [](State& state, const typename State::position_type position, const typename State::string_view_type key, lexy::nullopt, ini::comment_type&& comment) -> void
+						// { state.value(position, key, typename State::string_view_type{}, std::move(comment)); },
 						// [identifier] = [] []
-						[](ParseState& state, const default_char_type* position, ini::string_type&& key, lexy::nullopt, lexy::nullopt) -> void
-						{ state.value(position, std::move(key), ini::string_type{}); });
+						[](State& state, const typename State::position_type position, const typename State::string_view_type key, lexy::nullopt, lexy::nullopt) -> void
+						{ state.value(position, key, typename State::string_view_type{}); });
 			};
 
 		public:
@@ -467,16 +411,16 @@ namespace
 			constexpr static auto				rule =
 					LEXY_DEBUG("parse variable_declaration begin") +
 					dsl::position +
-					dsl::p<variable_key> +
+					dsl::p<variable_key<State>> +
 					dsl::equal_sign +
-					dsl::opt(dsl::p<variable_value>) +
-					dsl::opt(comment_inline_production<ParseState, CommentRequired>) +
+					dsl::opt(dsl::p<variable_value<State>>) +
+					dsl::opt(comment_inline_production<State, CommentRequired>) +
 					LEXY_DEBUG("parse variable_declaration end");
 
-			constexpr static auto value = value_generator<ParseState, CommentRequired>::value;
+			constexpr static auto value = value_generator<State, CommentRequired>::value;
 		};
 
-		template<typename ParseState, bool CommentRequired>
+		template<typename State, bool CommentRequired>
 		struct variable_or_comment
 		{
 			[[nodiscard]] consteval static auto name() noexcept -> const char* { return "[variable or comment]"; }
@@ -489,43 +433,43 @@ namespace
 					// comment
 					// todo: sign?
 					(dsl::peek(
-							 dsl::lit_c<comment_hash_sign<ParseState, CommentRequired>::indication> |
-							 dsl::lit_c<comment_semicolon<ParseState, CommentRequired>::indication>) >>
-					 comment_production<ParseState, CommentRequired>) |
+							 dsl::lit_c<comment_hash_sign<State, CommentRequired>::indication> |
+							 dsl::lit_c<comment_semicolon<State, CommentRequired>::indication>) >>
+					 comment_production<State, CommentRequired>) |
 					// variable
 					(dsl::else_ >>
-					 (dsl::p<variable_declaration<ParseState, CommentRequired>> +
+					 (dsl::p<variable_declaration<State, CommentRequired>> +
 					  // a newline required
 					  dsl::newline));
 
 			constexpr static auto value = lexy::forward<void>;
 		};
 
-		template<typename ParseState, bool CommentRequired>
+		template<typename State, bool CommentRequired>
 		struct group_declaration
 		{
 		private:
-			template<typename P, bool>
+			template<typename S, bool>
 			struct value_generator;
 
-			template<typename P>
-			struct value_generator<P, false>
+			template<typename S>
+			struct value_generator<S, false>
 			{
 				constexpr static auto value = callback<void>(
-						[]<typename... Ignore>(P& state, const default_char_type* position, ini::string_type&& group_name, [[maybe_unused]] Ignore&&... ignore) -> void
-						{ state.begin_group(position, std::move(group_name)); });
+						[]<typename... Ignore>(S& state, const typename S::position_type position, const typename S::string_view_type group_name, [[maybe_unused]] Ignore&&... ignore) -> void
+						{ state.group(position, group_name); });
 			};
 
-			template<typename P>
-			struct value_generator<P, true>
+			template<typename S>
+			struct value_generator<S, true>
 			{
 				constexpr static auto value = callback<void>(
 						// [group_name] [comment]
-						[](P& state, const default_char_type* position, ini::string_type&& group_name, ini::comment_type&& comment) -> void
-						{ state.begin_group(position, std::move(group_name), std::move(comment)); },
+						// [](P& state, const typename State::position_type position, const typename State::string_view_type group_name, ini::comment_type&& comment) -> void
+						// { state.group(position, std::move(group_name), std::move(comment)); },
 						// [group_name] []
-						[](P& state, const default_char_type* position, ini::string_type&& group_name, lexy::nullopt) -> void
-						{ state.begin_group(position, std::move(group_name)); });
+						[](S& state, const typename S::position_type position, const typename S::string_view_type group_name, lexy::nullopt) -> void
+						{ state.group(position, group_name); });
 			};
 
 		public:
@@ -539,19 +483,19 @@ namespace
 						LEXY_DEBUG("parse group_name begin") +
 						dsl::position +
 						// group name
-						dsl::p<group_name> +
+						dsl::p<group_name<State>> +
 						LEXY_DEBUG("parse group_name end") +
 						// ]
 						dsl::square_bracketed.close() +
-						dsl::opt(comment_inline_production<ParseState, CommentRequired>) +
+						dsl::opt(comment_inline_production<State, CommentRequired>) +
 						dsl::until(dsl::newline);
 
-				constexpr static auto value = value_generator<ParseState, CommentRequired>::value;
+				constexpr static auto value = value_generator<State, CommentRequired>::value;
 			};
 
 			// end with 'eof' or next '[' (group begin)
 			constexpr static auto rule =
-					dsl::if_(comment_production<ParseState, CommentRequired>) +
+					dsl::if_(comment_production<State, CommentRequired>) +
 					// [
 					(dsl::square_bracketed.open() >>
 					 (dsl::p<header> +
@@ -561,7 +505,7 @@ namespace
 							  dsl::peek(dsl::square_bracketed.open()))
 							  .opt_list(
 									  dsl::try_(
-											  dsl::p<variable_or_comment<ParseState, CommentRequired>>,
+											  dsl::p<variable_or_comment<State, CommentRequired>>,
 											  // ignore this line if an error raised
 											  dsl::until(dsl::newline))) +
 					  LEXY_DEBUG("parse group properties end")));
@@ -569,24 +513,24 @@ namespace
 			constexpr static auto value = lexy::forward<void>;
 		};
 
-		template<typename ParseState, bool CommentRequired>
+		template<typename State, bool CommentRequired>
 		struct file
 		{
 			[[nodiscard]] consteval static auto name() noexcept -> const char* { return "[file context]"; }
 
 			constexpr static auto				whitespace = dsl::ascii::blank;
 
-			constexpr static auto				rule	   = dsl::terminator(dsl::eof).opt_list(dsl::p<group_declaration<ParseState, CommentRequired>>);
+			constexpr static auto				rule	   = dsl::terminator(dsl::eof).opt_list(dsl::p<group_declaration<State, CommentRequired>>);
 
 			constexpr static auto				value	   = lexy::forward<void>;
 		};
 	}// namespace grammar
 
 	template<typename State>
-		requires std::is_same_v<State, ExtractorState> || std::is_same_v<State, ExtractorStateWithComment>
 	auto extract(State& state) -> void
 	{
-		constexpr bool is_comment_required = std::is_same_v<State, ExtractorStateWithComment>;
+		// todo
+		constexpr bool is_comment_required = false;
 
 		if (const auto result =
 					lexy::parse<grammar::file<State, is_comment_required>>(
@@ -598,7 +542,7 @@ namespace
 			// todo: error ?
 		}
 
-#ifdef GAL_INI_TRACE_PARSE
+#ifdef GAL_INI_TRACE_EXTRACT
 		lexy::trace<grammar::file<State, is_comment_required>>(
 				stderr,
 				state.buffer(),
@@ -607,109 +551,120 @@ namespace
 	}
 }// namespace
 
-namespace gal::ini::impl
+namespace gal::ini::extractor_detail
 {
-	template<typename Extractor, typename State>
-	auto do_extract_from_file(typename Extractor::file_path_type file_path, typename Extractor::context_type& out) -> FileExtractResult
+	namespace
 	{
-		std::filesystem::path path{file_path};
-		if (!exists(path))
+		template<typename State, typename Char>
+		[[nodiscard]] auto extract_from_file(
+				std::string_view		file_path,
+				group_append_type<Char> group_appender) -> ExtractResult
 		{
-			return FileExtractResult::FILE_NOT_FOUND;
-		}
-
-		if (auto file = lexy::read_file<default_encoding>(file_path.data());
-			!file)
-		{
-			switch (file.error())
+			std::filesystem::path path{file_path};
+			if (!exists(path))
 			{
-				case lexy::file_error::file_not_found:
+				return ExtractResult::FILE_NOT_FOUND;
+			}
+
+			if (auto file = lexy::read_file<typename State::encoding>(file_path.data());
+				!file)
+			{
+				switch (file.error())
 				{
-					return FileExtractResult::FILE_NOT_FOUND;
-				}
-				case lexy::file_error::permission_denied:
-				{
-					return FileExtractResult::PERMISSION_DENIED;
-				}
-				case lexy::file_error::os_error:
-				{
-					return FileExtractResult::INTERNAL_ERROR;
-				}
-				case lexy::file_error::_success:
-				default:
-				{
-					GAL_INI_UNREACHABLE();
+					case lexy::file_error::file_not_found:
+					{
+						return ExtractResult::FILE_NOT_FOUND;
+					}
+					case lexy::file_error::permission_denied:
+					{
+						return ExtractResult::PERMISSION_DENIED;
+					}
+					case lexy::file_error::os_error:
+					{
+						return ExtractResult::INTERNAL_ERROR;
+					}
+					case lexy::file_error::_success:
+					default:
+					{
+						GAL_INI_UNREACHABLE();
+					}
 				}
 			}
+			else
+			{
+				State state{{file.buffer().data(), file.buffer().size()}, file_path, group_appender};
+
+				extract(state);
+
+				return ExtractResult::SUCCESS;
+			}
 		}
-		else
-		{
-			State state{{file.buffer().data(), file.buffer().size()}, file_path, out};
+	}// namespace
 
-			extract(state);
-
-			return FileExtractResult::SUCCESS;
-		}
-	}
-
-	template<typename Extractor, typename State>
-	auto do_extract_from_buffer(typename Extractor::buffer_type string_buffer, typename Extractor::context_type& out) -> void
+	// char
+	[[nodiscard]] auto extract_from_file(
+			std::string_view		file_path,
+			group_append_type<char> group_appender) -> ExtractResult
 	{
-		if (auto buffer = buffer_view_type{string_buffer};
-			buffer.size())
-		{
-			State state{buffer, ErrorReporter::buffer_file_path, out};
+		using char_type = char;
+		// todo: encoding?
+		using encoding	= lexy::utf8_char_encoding;
 
-			extract(state);
-		}
+		return extract_from_file<ExtractorState<char_type, group_append_type<char_type>, kv_append_type<char_type>, encoding>>(
+				file_path,
+				group_appender);
 	}
 
+	// wchar_t
+	// [[nodiscard]] auto extract_from_file(
+	// 		std::string_view		   file_path,
+	// 		group_append_type<wchar_t> group_appender) -> ExtractResult
+	// {
+	// 	using char_type = wchar_t;
+	// 	// todo: encoding?
+	// 	using encoding	= lexy::utf32_encoding;
 
-	auto IniExtractor::extract_from_file(file_path_type file_path, context_type& out) -> FileExtractResult
+	// 	return extract_from_file<ExtractorState<char_type, group_append_type<char_type>, kv_append_type<char_type>, encoding>>(
+	// 			file_path,
+	// 			group_appender);
+	// }
+
+	// char8_t
+	[[nodiscard]] auto extract_from_file(
+			std::string_view		   file_path,
+			group_append_type<char8_t> group_appender) -> ExtractResult
 	{
-		return do_extract_from_file<IniExtractor, ExtractorState>(file_path, out);
+		using char_type = char8_t;
+		using encoding	= lexy::deduce_encoding<char_type>;
+
+		return extract_from_file<ExtractorState<char_type, group_append_type<char_type>, kv_append_type<char_type>, encoding>>(
+				file_path,
+				group_appender);
 	}
 
-	auto IniExtractor::extract_from_file(file_path_type file_path) -> std::pair<FileExtractResult, context_type>
+	// char16_t
+	[[nodiscard]] auto extract_from_file(
+			std::string_view			file_path,
+			group_append_type<char16_t> group_appender) -> ExtractResult
 	{
-		context_type out{};
-		auto		 result = extract_from_file(file_path, out);
-		return {result, out};
+		using char_type = char16_t;
+		using encoding	= lexy::deduce_encoding<char_type>;
+
+		return extract_from_file<ExtractorState<char_type, group_append_type<char_type>, kv_append_type<char_type>, encoding>>(
+				file_path,
+				group_appender);
 	}
 
-	auto IniExtractor::extract_from_buffer(buffer_type string_buffer, context_type& out) -> void
+	// char32_t
+	[[nodiscard]] auto extract_from_file(
+			std::string_view			file_path,
+			group_append_type<char32_t> group_appender) -> ExtractResult
 	{
-		return do_extract_from_buffer<IniExtractor, ExtractorState>(string_buffer, out);
-	}
+		using char_type = char32_t;
+		using encoding	= lexy::deduce_encoding<char_type>;
 
-	auto IniExtractor::extract_from_buffer(buffer_type string_buffer) -> context_type
-	{
-		context_type out;
-		extract_from_buffer(string_buffer, out);
-		return out;
+		return extract_from_file<ExtractorState<char_type, group_append_type<char_type>, kv_append_type<char_type>, encoding>>(
+				file_path,
+				group_appender);
 	}
-
-	auto IniExtractorWithComment::extract_from_file(file_path_type file_path, context_type& out) -> FileExtractResult
-	{
-		return do_extract_from_file<IniExtractorWithComment, ExtractorStateWithComment>(file_path, out);
-	}
-
-	auto IniExtractorWithComment::extract_from_file(file_path_type file_path) -> std::pair<FileExtractResult, context_type>
-	{
-		context_type out{};
-		auto		 result = extract_from_file(file_path, out);
-		return {result, out};
-	}
-
-	auto IniExtractorWithComment::extract_from_buffer(buffer_type string_buffer, context_type& out) -> void
-	{
-		return do_extract_from_buffer<IniExtractorWithComment, ExtractorStateWithComment>(string_buffer, out);
-	}
-
-	auto IniExtractorWithComment::extract_from_buffer(buffer_type string_buffer) -> context_type
-	{
-		context_type out;
-		extract_from_buffer(string_buffer, out);
-		return out;
-	}
-}// namespace gal::ini::impl
+}// namespace gal::ini::extractor_detail
