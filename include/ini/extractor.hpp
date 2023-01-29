@@ -1,6 +1,6 @@
 #pragma once
 
-#include <ini/group_accessor.hpp>
+#include <ini/internal/common.hpp>
 
 #if defined(GAL_INI_STD_STRING)
 	#include <string>
