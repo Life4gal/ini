@@ -11,6 +11,12 @@
 	#define GAL_INI_UNREACHABLE() throw
 #endif
 
+#ifdef GAL_INI_COMPILER_MSVC
+	#define GAL_INI_STRING_CONSTEXPR constexpr
+#else
+	#define GAL_INI_STRING_CONSTEXPR inline
+#endif
+
 namespace gal::ini
 {
 	namespace common
@@ -106,6 +112,38 @@ namespace gal::ini
 		using map_allocator_type_t = map_allocator_type<T>::template type<NewKey, NewValue>;
 
 		template<typename T>
+		struct map_hash_type;
+
+		template<
+				template<typename>
+				typename Hash,
+				typename Key>
+		struct map_hash_type<Hash<Key>>
+		{
+			template<typename NewKey>
+			using type = Hash<NewKey>;
+		};
+
+		template<typename T, typename NewKey>
+		using map_hash_type_t = map_hash_type<T>::template type<NewKey>;
+
+		template<typename T>
+		struct map_comparator_type;
+
+		template<
+				template<typename>
+				typename Comparator,
+				typename Key>
+		struct map_comparator_type<Comparator<Key>>
+		{
+			template<typename NewKey>
+			using type = Comparator<NewKey>;
+		};
+
+		template<typename T, typename NewKey>
+		using map_comparator_type_t = map_comparator_type<T>::template type<NewKey>;
+
+		template<typename T>
 		struct map_type;
 
 		template<
@@ -119,7 +157,7 @@ namespace gal::ini
 				typename... NeverMind>
 		struct map_type<Map<Key, Value, Hash, KeyComparator, Allocator, NeverMind...>>
 		{
-			template<typename NewKey, typename NewValue, typename NewHash = Hash, typename NewKeyComparator = KeyComparator>
+			template<typename NewKey, typename NewValue, typename NewHash = map_hash_type_t<Hash, NewKey>, typename NewKeyComparator = map_comparator_type_t<KeyComparator, NewKey>>
 			using type = Map<NewKey, NewValue, NewHash, NewKeyComparator, map_allocator_type_t<Allocator, NewKey, NewValue>, NeverMind...>;
 		};
 
@@ -133,7 +171,7 @@ namespace gal::ini
 				typename... NeverMind>
 		struct map_type<Map<Key, Value, Hash, Allocator, NeverMind...>>
 		{
-			template<typename NewKey, typename NewValue, typename NewHash = Hash>
+			template<typename NewKey, typename NewValue, typename NewHash = map_hash_type_t<Hash, NewKey>>
 			using type = Map<NewKey, NewValue, NewHash, map_allocator_type_t<Allocator, NewKey, NewValue>, NeverMind...>;
 		};
 
@@ -409,6 +447,77 @@ namespace gal::ini
 	constexpr auto comment_indication_hash_sign = common::make_comment_indication<typename string_view_t<String>::value_type, CommentIndication::HASH_SIGN>();
 	template<typename String>
 	constexpr auto comment_indication_semicolon = common::make_comment_indication<typename string_view_t<String>::value_type, CommentIndication::SEMICOLON>();
+
+	template<typename String>
+	struct comment_type;
+
+	template<typename String>
+	struct comment_view_type
+	{
+		using string_type = String;
+
+		CommentIndication							indication;
+		string_view_t<string_type>					comment;
+
+		[[nodiscard]] constexpr auto				empty() const noexcept -> bool { return indication == CommentIndication::INVALID; }
+
+		[[nodiscard]] constexpr auto				operator==(const comment_view_type& other) const noexcept -> bool { return indication == other.indication && comment == other.comment; }
+
+		[[nodiscard]] GAL_INI_STRING_CONSTEXPR auto operator==(const comment_type<string_type>& other) const noexcept -> bool;
+	};
+
+	template<typename String>
+	struct comment_type
+	{
+		using string_type = String;
+
+		CommentIndication									   indication;
+		string_type											   comment;
+
+		[[nodiscard]] GAL_INI_STRING_CONSTEXPR auto			   empty() const noexcept -> bool { return comment.empty(); }
+
+		[[nodiscard]] GAL_INI_STRING_CONSTEXPR explicit(false) operator comment_view_type<string_type>() const noexcept { return {indication, comment}; }
+
+		[[nodiscard]] constexpr auto						   operator==(const comment_type& other) const noexcept -> bool { return indication == other.indication && comment == other.comment; }
+	};
+
+	template<typename String>
+	GAL_INI_STRING_CONSTEXPR auto comment_view_type<String>::operator==(const comment_type<String>& other) const noexcept -> bool
+	{
+		return *this == other.operator comment_view_type();
+	}
+
+	template<typename String>
+	[[nodiscard]] constexpr auto make_comment_indication(decltype(comment_indication_hash_sign<String>) indication) -> CommentIndication
+	{
+		if (indication == comment_indication_hash_sign<String>) { return CommentIndication::HASH_SIGN; }
+
+		if (indication == comment_indication_semicolon<String>) { return CommentIndication::SEMICOLON; }
+
+		return CommentIndication::INVALID;
+	}
+
+	template<typename String>
+	[[nodiscard]] constexpr auto make_comment_indication(const CommentIndication indication) -> std::remove_cvref_t<decltype(comment_indication_hash_sign<String>)>
+	{
+		if (indication == CommentIndication::HASH_SIGN) { return comment_indication_hash_sign<String>; }
+
+		if (indication == CommentIndication::SEMICOLON) { return comment_indication_semicolon<String>; }
+
+		GAL_INI_UNREACHABLE();
+	}
+
+	template<typename String>
+	[[nodiscard]] GAL_INI_STRING_CONSTEXPR auto make_comment(const CommentIndication indication, String&& comment) -> comment_type<String>
+	{
+		return {.indication = indication, .comment = std::forward<String>(comment)};
+	}
+
+	template<typename String>
+	[[nodiscard]] constexpr auto make_comment_view(const CommentIndication indication, const string_view_t<String> comment) -> comment_view_type<String>
+	{
+		return {.indication = indication, .comment = comment};
+	}
 
 	template<typename T>
 	class StackFunction;
