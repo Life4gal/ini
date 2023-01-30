@@ -231,7 +231,7 @@ namespace gal::ini
 	template<typename ContextType>
 	auto extract_from_file(std::string_view file_path, ContextType& out) -> ExtractResult
 	{
-		using context_type			 = std::remove_cvref_t<decltype(out)>;
+		using context_type			 = ContextType;
 
 		using key_type				 = context_type::key_type;
 		using group_type			 = context_type::mapped_type;
@@ -243,7 +243,7 @@ namespace gal::ini
 		using this_kv_append_type	 = kv_append_type<char_type>;
 		using this_group_append_type = group_append_type<char_type>;
 
-		return extract_from_file(
+		return extract_from_file<ContextType>(
 				file_path,
 				this_group_append_type{
 						[&out](string_view_t<key_type> group_name) -> group_append_result<char_type>
@@ -253,7 +253,7 @@ namespace gal::ini
 									.name = group_it->first,
 									.kv_appender =
 											this_kv_append_type{
-													[group_it](string_view_t<group_key_type> key, string_view_t<group_mapped_type> value) -> std::pair<std::pair<string_view_t<group_key_type>, string_view_t<group_mapped_type>>, bool>
+													[group_it](const string_view_t<group_key_type> key, const string_view_t<group_mapped_type> value) -> std::pair<std::pair<string_view_t<group_key_type>, string_view_t<group_mapped_type>>, bool>
 													{
 														const auto [kv_it, kv_inserted] = group_it->second.emplace(group_key_type{key}, group_mapped_type{value});
 														return {{kv_it->first, kv_it->second}, kv_inserted};
