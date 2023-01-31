@@ -65,8 +65,13 @@ namespace
 		}
 	};
 
-	auto check_initial_data = [](const context_type& this_data) -> void
+	auto check_initial_data = [](const ExtractResult extract_result, const context_type& this_data) -> void
 	{
+		"extract_ok"_test = [extract_result]
+		{
+			expect((extract_result == ExtractResult::SUCCESS) >> fatal);
+		};
+
 		"group_size"_test = [&]
 		{ expect((this_data.size() == 5_i) >> fatal); };
 
@@ -138,7 +143,7 @@ namespace
 
 	GAL_INI_NO_DESTROY [[maybe_unused]] suite test_ini_flusher_initial_data = []
 	{
-		check_initial_data(data);
+		check_initial_data(ExtractResult::SUCCESS, data);
 	};
 
 	GAL_INI_NO_DESTROY [[maybe_unused]] suite test_ini_flusher_flush_to_file = []
@@ -153,7 +158,7 @@ namespace
 		auto [extract_result, extract_data] = extract_from_file<context_type>(TEST_INI_FLUSHER_FILE_PATH);
 #endif
 
-		check_initial_data(extract_data);
+		check_initial_data(extract_result, extract_data);
 	};
 
 	GAL_INI_NO_DESTROY [[maybe_unused]] suite test_ini_flusher_flush_to_file_keep_empty_group = []
@@ -178,7 +183,7 @@ namespace
 						<< group_name
 						<< square_bracket<key_type>.second
 						// write something random, for demonstration purposes only, this content is considered a comment.
-						;//<< " ; foo bar baz here";
+						<< " ; foo bar baz here";
 			};
 			constexpr static auto do_flush_kv = [](std::basic_ostream<char_type>& out, const std::basic_string_view<char_type> key, const std::basic_string_view<char_type> value) -> void
 			{
@@ -188,7 +193,7 @@ namespace
 						<< key
 						<< blank_separator<group_key_type> << kv_separator<group_key_type> << blank_separator<group_key_type> << value
 						// write something random, for demonstration purposes only, this content is considered a comment.
-						;//<< "# foo bar baz here";
+						<< "# foo bar baz here";
 			};
 
 			// We need the following two temporary variables to hold some necessary information, and they must have a longer lifetime than the incoming StackFunction.
