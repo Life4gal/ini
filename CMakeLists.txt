@@ -9,12 +9,12 @@ set(
 
 set(
 		${PROJECT_NAME_PREFIX}MINOR_VERSION
-		0
+		2
 )
 
 set(
 		${PROJECT_NAME_PREFIX}PATCH_VERSION
-		1
+		3
 )
 
 set(${PROJECT_NAME_PREFIX}VERSION ${${PROJECT_NAME_PREFIX}MAJOR_VERSION}.${${PROJECT_NAME_PREFIX}MINOR_VERSION}.${${PROJECT_NAME_PREFIX}PATCH_VERSION})
@@ -178,35 +178,20 @@ else ()
 endif (${PROJECT_NAME_PREFIX}SYSTEM_HEADERS)
 
 # HEADER FILES
-#file(
-#		GLOB_RECURSE
-#		${PROJECT_NAME_PREFIX}HEADER
-#		CONFIGURE_DEPENDS
-#
-#		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/*.hpp
-#)
 set(
 		${PROJECT_NAME_PREFIX}HEADER
 
-		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/ini.hpp
-		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/impl/group_accessor.hpp
-		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/impl/extractor.hpp
-		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/impl/manager.hpp
-		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/impl/flusher.hpp
+		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/internal/common.hpp
+
+		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/group_accessor.hpp
+		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/extractor.hpp
+		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/flusher.hpp
 )
 
 # SOURCE FILES
-#file(
-#		GLOB_RECURSE
-#		${PROJECT_NAME_PREFIX}SOURCE
-#		CONFIGURE_DEPENDS
-#
-#		${PROJECT_SOURCE_DIR}/src/*.cpp
-#)
 set(
 		${PROJECT_NAME_PREFIX}SOURCE
 
-		${PROJECT_SOURCE_DIR}/src/group_accessor.cpp
 		${PROJECT_SOURCE_DIR}/src/extractor.cpp
 		${PROJECT_SOURCE_DIR}/src/flusher.cpp
 )
