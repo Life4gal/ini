@@ -61,8 +61,15 @@ namespace
 	public:
 		explicit FlushFile(const file_path_type file_path)
 			: source_path_{file_path},
-			  temp_path_{std::filesystem::temp_directory_path() / source_path_.filename()},
-			  out_{temp_path_, std::ios::out | std::ios::trunc} {}
+			  temp_path_{
+					  std::filesystem::temp_directory_path() /
+					  // todo: Do we need a unique file name? Because if we open the file in std::ios::trunc mode and write less data than before, some unwanted garbage data will be left in the file.
+					  source_path_.stem().string().append(std::to_string(reinterpret_cast<std::uintptr_t>(&source_path_))).append(source_path_.extension().string())
+					  // source_path_.filename()
+			  },
+			  out_{temp_path_, std::ios::out | std::ios::trunc}
+		{
+		}
 
 		FlushFile(const FlushFile&)					   = delete;
 		FlushFile(FlushFile&&)						   = delete;
