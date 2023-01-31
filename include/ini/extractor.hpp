@@ -256,22 +256,34 @@ namespace gal::ini
 	template<typename ContextType>
 	auto extract_from_file(std::string_view file_path, ContextType& out) -> ExtractResult
 	{
-		using context_type			 = ContextType;
+		using context_type								 = ContextType;
 
-		using key_type				 = typename context_type::key_type;
-		using group_type			 = typename context_type::mapped_type;
+		using key_type									 = typename context_type::key_type;
+		using group_type								 = typename context_type::mapped_type;
 
-		using group_key_type		 = typename group_type::key_type;
-		using group_mapped_type		 = typename group_type::mapped_type;
+		using group_key_type							 = typename group_type::key_type;
+		using group_mapped_type							 = typename group_type::mapped_type;
 
-		using char_type				 = typename string_view_t<key_type>::value_type;
-		using this_kv_append_type	 = kv_append_type<char_type>;
-		using this_group_append_type = group_append_type<char_type>;
+		using char_type									 = typename string_view_t<key_type>::value_type;
+
+		// We need the following one temporary variable to hold some necessary information, and they must have a longer lifetime than the incoming StackFunction.
+		typename context_type::iterator current_group_it = out.end();
+
+		// !!!MUST PLACE HERE!!!
+		// StackFunction keeps the address of the lambda and forwards the argument to the lambda when StackFunction::operator() has been called.
+		// This requires that the lambda "must" exist at this point (i.e. have a longer lifecycle than the StackFunction), which is fine for a single-level lambda (maybe?).
+		// However, if there is nesting, then the lambda will end its lifecycle early and the StackFunction will refer to an illegal address.
+		// Walking on the edge of UB!
+		auto							kv_appender		 = [&current_group_it](const string_view_t<group_key_type> key, const string_view_t<group_mapped_type> value) -> std::pair<std::pair<string_view_t<group_key_type>, string_view_t<group_mapped_type>>, bool>
+		{
+			const auto [kv_it, kv_inserted] = current_group_it->second.emplace(group_key_type{key}, group_mapped_type{value});
+			return {{kv_it->first, kv_it->second}, kv_inserted};
+		};
 
 		return extract_from_file<ContextType>(
 				file_path,
-				this_group_append_type{
-						[&out](string_view_t<key_type> group_name) -> group_append_result<char_type>
+				group_append_type<char_type>{
+						[&out, &current_group_it, &kv_appender](string_view_t<key_type> group_name) -> group_append_result<char_type>
 						{
 #if defined(GAL_INI_COMPILER_APPLE_CLANG) || defined(GAL_INI_COMPILER_CLANG_CL) || defined(GAL_INI_COMPILER_CLANG)
 							const auto workaround_emplace_result = out.emplace(key_type{group_name}, group_type{});
@@ -281,16 +293,12 @@ namespace gal::ini
 							const auto [group_it, group_inserted] = out.emplace(key_type{group_name}, group_type{});
 #endif
 
+							current_group_it = group_it;
+
 							return {
-									.name = group_it->first,
-									.kv_appender =
-											this_kv_append_type{
-													[group_it](const string_view_t<group_key_type> key, const string_view_t<group_mapped_type> value) -> std::pair<std::pair<string_view_t<group_key_type>, string_view_t<group_mapped_type>>, bool>
-													{
-														const auto [kv_it, kv_inserted] = group_it->second.emplace(group_key_type{key}, group_mapped_type{value});
-														return {{kv_it->first, kv_it->second}, kv_inserted};
-													}},
-									.inserted = group_inserted};
+									.name		 = group_it->first,
+									.kv_appender = kv_appender,
+									.inserted	 = group_inserted};
 						}});
 	}
 
@@ -331,22 +339,34 @@ namespace gal::ini
 			std::basic_string_view<typename string_view_t<typename ContextType::key_type>::value_type> buffer,
 			ContextType&																			   out) -> ExtractResult
 	{
-		using context_type			 = ContextType;
+		using context_type								 = ContextType;
 
-		using key_type				 = typename context_type::key_type;
-		using group_type			 = typename context_type::mapped_type;
+		using key_type									 = typename context_type::key_type;
+		using group_type								 = typename context_type::mapped_type;
 
-		using group_key_type		 = typename group_type::key_type;
-		using group_mapped_type		 = typename group_type::mapped_type;
+		using group_key_type							 = typename group_type::key_type;
+		using group_mapped_type							 = typename group_type::mapped_type;
 
-		using char_type				 = typename string_view_t<key_type>::value_type;
-		using this_kv_append_type	 = kv_append_type<char_type>;
-		using this_group_append_type = group_append_type<char_type>;
+		using char_type									 = typename string_view_t<key_type>::value_type;
+
+		// We need the following one temporary variable to hold some necessary information, and they must have a longer lifetime than the incoming StackFunction.
+		typename context_type::iterator current_group_it = out.end();
+
+		// !!!MUST PLACE HERE!!!
+		// StackFunction keeps the address of the lambda and forwards the argument to the lambda when StackFunction::operator() has been called.
+		// This requires that the lambda "must" exist at this point (i.e. have a longer lifecycle than the StackFunction), which is fine for a single-level lambda (maybe?).
+		// However, if there is nesting, then the lambda will end its lifecycle early and the StackFunction will refer to an illegal address.
+		// Walking on the edge of UB!
+		auto							kv_appender		 = [&current_group_it](const string_view_t<group_key_type> key, const string_view_t<group_mapped_type> value) -> std::pair<std::pair<string_view_t<group_key_type>, string_view_t<group_mapped_type>>, bool>
+		{
+			const auto [kv_it, kv_inserted] = current_group_it->second.emplace(group_key_type{key}, group_mapped_type{value});
+			return {{kv_it->first, kv_it->second}, kv_inserted};
+		};
 
 		return extract_from_buffer<ContextType>(
 				buffer,
-				this_group_append_type{
-						[&out](string_view_t<key_type> group_name) -> group_append_result<char_type>
+				group_append_type<char_type>{
+						[&out, &current_group_it, &kv_appender](string_view_t<key_type> group_name) -> group_append_result<char_type>
 						{
 #if defined(GAL_INI_COMPILER_APPLE_CLANG) || defined(GAL_INI_COMPILER_CLANG_CL) || defined(GAL_INI_COMPILER_CLANG)
 							const auto workaround_emplace_result = out.emplace(key_type{group_name}, group_type{});
@@ -356,16 +376,12 @@ namespace gal::ini
 							const auto [group_it, group_inserted] = out.emplace(key_type{group_name}, group_type{});
 #endif
 
+							current_group_it = group_it;
+
 							return {
-									.name = group_it->first,
-									.kv_appender =
-											this_kv_append_type{
-													[group_it](const string_view_t<group_key_type> key, const string_view_t<group_mapped_type> value) -> std::pair<std::pair<string_view_t<group_key_type>, string_view_t<group_mapped_type>>, bool>
-													{
-														const auto [kv_it, kv_inserted] = group_it->second.emplace(group_key_type{key}, group_mapped_type{value});
-														return {{kv_it->first, kv_it->second}, kv_inserted};
-													}},
-									.inserted = group_inserted};
+									.name		 = group_it->first,
+									.kv_appender = kv_appender,
+									.inserted	 = group_inserted};
 						}});
 	}
 
