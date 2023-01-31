@@ -37,7 +37,7 @@ namespace gal::ini
 		};
 
 		template<typename T>
-		using char_type_t = char_type<T>::type;
+		using char_type_t = typename char_type<T>::type;
 
 		template<typename T>
 		struct char_traits;
@@ -53,7 +53,7 @@ namespace gal::ini
 		};
 
 		template<typename T>
-		using char_traits_t = char_traits<T>::type;
+		using char_traits_t = typename char_traits<T>::type;
 
 		template<typename T>
 		struct map_allocator_type;
@@ -109,7 +109,7 @@ namespace gal::ini
 		};
 
 		template<typename T, typename NewKey, typename NewValue>
-		using map_allocator_type_t = map_allocator_type<T>::template type<NewKey, NewValue>;
+		using map_allocator_type_t = typename map_allocator_type<T>::template type<NewKey, NewValue>;
 
 		template<typename T>
 		struct map_hash_type;
@@ -125,7 +125,7 @@ namespace gal::ini
 		};
 
 		template<typename T, typename NewKey>
-		using map_hash_type_t = map_hash_type<T>::template type<NewKey>;
+		using map_hash_type_t = typename map_hash_type<T>::template type<NewKey>;
 
 		template<typename T>
 		struct map_comparator_type;
@@ -141,7 +141,7 @@ namespace gal::ini
 		};
 
 		template<typename T, typename NewKey>
-		using map_comparator_type_t = map_comparator_type<T>::template type<NewKey>;
+		using map_comparator_type_t = typename map_comparator_type<T>::template type<NewKey>;
 
 		template<typename T>
 		struct map_type;
@@ -201,7 +201,7 @@ namespace gal::ini
 		};
 
 		template<typename T, typename... Required>
-		using map_type_t = map_type<T>::template type<Required...>;
+		using map_type_t = typename map_type<T>::template type<Required...>;
 	}// namespace common
 
 	template<typename String>
@@ -344,13 +344,13 @@ namespace gal::ini
 	}// namespace common
 
 	template<typename String>
-	constexpr auto line_separator = common::make_line_separator<typename string_view_t<String>::value_type>();
+	inline constexpr auto line_separator = common::make_line_separator<typename string_view_t<String>::value_type>();
 	template<typename String>
-	constexpr auto kv_separator = common::make_kv_separator<typename string_view_t<String>::value_type>();
+	inline constexpr auto kv_separator = common::make_kv_separator<typename string_view_t<String>::value_type>();
 	template<typename String>
-	constexpr auto blank_separator = common::make_blank_separator<typename string_view_t<String>::value_type>();
+	inline constexpr auto blank_separator = common::make_blank_separator<typename string_view_t<String>::value_type>();
 	template<typename String>
-	constexpr auto square_bracket = common::make_square_bracket<typename string_view_t<String>::value_type>();
+	inline constexpr auto square_bracket = common::make_square_bracket<typename string_view_t<String>::value_type>();
 
 	enum class CommentIndication
 	{
@@ -444,9 +444,9 @@ namespace gal::ini
 	}// namespace common
 
 	template<typename String>
-	constexpr auto comment_indication_hash_sign = common::make_comment_indication<typename string_view_t<String>::value_type, CommentIndication::HASH_SIGN>();
+	inline constexpr auto comment_indication_hash_sign = common::make_comment_indication<typename string_view_t<String>::value_type, CommentIndication::HASH_SIGN>();
 	template<typename String>
-	constexpr auto comment_indication_semicolon = common::make_comment_indication<typename string_view_t<String>::value_type, CommentIndication::SEMICOLON>();
+	inline constexpr auto comment_indication_semicolon = common::make_comment_indication<typename string_view_t<String>::value_type, CommentIndication::SEMICOLON>();
 
 	template<typename String>
 	struct comment_type;

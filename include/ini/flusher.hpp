@@ -163,7 +163,7 @@ namespace gal::ini
 	 * @brief Flush ini data to files.
 	 * @tparam ContextType Type of the input data.
 	 * @param file_path The (absolute) path to the file.
-	 * @param group_getter How to get a group.
+	 * @param group_handler Group handler.
 	 * @return Flush result.
 	 */
 	template<typename ContextType>
@@ -180,7 +180,7 @@ namespace gal::ini
 	 * @brief Flush ini data from files.
 	 * @tparam ContextType Type of the input data.
 	 * @param file_path The (absolute) path to the file.
-	 * @param out Where the extracted data is stored.
+	 * @param in Where the extracted data is stored.
 	 * @return Extract result.
 	 */
 	template<typename ContextType>
@@ -188,11 +188,11 @@ namespace gal::ini
 	{
 		using context_type						  = ContextType;
 
-		using key_type							  = context_type::key_type;
-		using group_type						  = context_type::mapped_type;
+		using key_type							  = typename context_type::key_type;
+		using group_type						  = typename context_type::mapped_type;
 
-		using group_key_type					  = group_type::key_type;
-		using group_mapped_type					  = group_type::mapped_type;
+		using group_key_type					  = typename group_type::key_type;
+		using group_mapped_type					  = typename group_type::mapped_type;
 
 		using char_type							  = typename string_view_t<key_type>::value_type;
 

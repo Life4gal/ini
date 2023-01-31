@@ -49,8 +49,8 @@ namespace
 		// does not own any of data
 		using buffer_view_type		= lexy::string_input<Encoding>;
 		using buffer_anchor_type	= lexy::input_location_anchor<buffer_view_type>;
-		using default_encoding		= buffer_view_type::encoding;
-		using default_char_type		= buffer_view_type::char_type;
+		using default_encoding		= typename buffer_view_type::encoding;
+		using default_char_type		= typename buffer_view_type::char_type;
 		using default_position_type = const default_char_type*;
 		static_assert(std::is_same_v<typename buffer_anchor_type::iterator, default_position_type>);
 
@@ -62,7 +62,7 @@ namespace
 	class ErrorReporter
 	{
 	public:
-		constexpr static file_path_type buffer_file_path{"anonymous buffer"};
+		constexpr static file_path_type buffer_file_path{"anonymous-buffer"};
 
 		template<typename Descriptor, typename StringType>
 		static auto report_duplicate_declaration(
@@ -116,8 +116,8 @@ namespace
 		using string_type			 = std::basic_string<Char>;
 
 		using buffer_descriptor_type = buffer_descriptor<encoding>;
-		using char_type				 = buffer_descriptor_type::default_char_type;
-		using position_type			 = buffer_descriptor_type::default_position_type;
+		using char_type				 = typename buffer_descriptor_type::default_char_type;
+		using position_type			 = typename buffer_descriptor_type::default_position_type;
 
 	private:
 		buffer_descriptor_type descriptor_;
@@ -127,14 +127,14 @@ namespace
 
 	public:
 		ExtractorState(
-				buffer_descriptor_type::buffer_view_type buffer,
-				const file_path_type					 file_path,
-				group_append_type						 group_appender)
+				typename buffer_descriptor_type::buffer_view_type buffer,
+				const file_path_type							  file_path,
+				group_append_type								  group_appender)
 			: descriptor_{buffer, typename buffer_descriptor_type::buffer_anchor_type{buffer}, file_path},
 			  group_appender_{group_appender},
 			  kv_appender_{} {}
 
-		[[nodiscard]] auto buffer() const -> buffer_descriptor_type::buffer_view_type
+		[[nodiscard]] auto buffer() const -> typename buffer_descriptor_type::buffer_view_type
 		{
 			return descriptor_.buffer;
 		}
@@ -611,8 +611,7 @@ namespace gal::ini::extractor_detail
 				std::basic_string_view<typename State::char_type> buffer,
 				group_append_type<typename State::char_type>	  group_appender) -> ExtractResult
 		{
-			// todo: file_path?
-			State state{{buffer.data(), buffer.size()}, "Anonymous-Buffer", group_appender};
+			State state{{buffer.data(), buffer.size()}, ErrorReporter::buffer_file_path, group_appender};
 
 			extract(state);
 

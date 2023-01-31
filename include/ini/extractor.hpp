@@ -258,11 +258,11 @@ namespace gal::ini
 	{
 		using context_type			 = ContextType;
 
-		using key_type				 = context_type::key_type;
-		using group_type			 = context_type::mapped_type;
+		using key_type				 = typename context_type::key_type;
+		using group_type			 = typename context_type::mapped_type;
 
-		using group_key_type		 = group_type::key_type;
-		using group_mapped_type		 = group_type::mapped_type;
+		using group_key_type		 = typename group_type::key_type;
+		using group_mapped_type		 = typename group_type::mapped_type;
 
 		using char_type				 = typename string_view_t<key_type>::value_type;
 		using this_kv_append_type	 = kv_append_type<char_type>;
@@ -273,7 +273,14 @@ namespace gal::ini
 				this_group_append_type{
 						[&out](string_view_t<key_type> group_name) -> group_append_result<char_type>
 						{
+#if defined(GAL_INI_COMPILER_APPLE_CLANG) || defined(GAL_INI_COMPILER_CLANG_CL) || defined(GAL_INI_COMPILER_CLANG)
+							const auto workaround_emplace_result = out.emplace(key_type{group_name}, group_type{});
+							const auto group_it					 = workaround_emplace_result.first;
+							const auto group_inserted			 = workaround_emplace_result.second;
+#else
 							const auto [group_it, group_inserted] = out.emplace(key_type{group_name}, group_type{});
+#endif
+
 							return {
 									.name = group_it->first,
 									.kv_appender =
@@ -326,11 +333,11 @@ namespace gal::ini
 	{
 		using context_type			 = ContextType;
 
-		using key_type				 = context_type::key_type;
-		using group_type			 = context_type::mapped_type;
+		using key_type				 = typename context_type::key_type;
+		using group_type			 = typename context_type::mapped_type;
 
-		using group_key_type		 = group_type::key_type;
-		using group_mapped_type		 = group_type::mapped_type;
+		using group_key_type		 = typename group_type::key_type;
+		using group_mapped_type		 = typename group_type::mapped_type;
 
 		using char_type				 = typename string_view_t<key_type>::value_type;
 		using this_kv_append_type	 = kv_append_type<char_type>;
@@ -341,7 +348,14 @@ namespace gal::ini
 				this_group_append_type{
 						[&out](string_view_t<key_type> group_name) -> group_append_result<char_type>
 						{
+#if defined(GAL_INI_COMPILER_APPLE_CLANG) || defined(GAL_INI_COMPILER_CLANG_CL) || defined(GAL_INI_COMPILER_CLANG)
+							const auto workaround_emplace_result = out.emplace(key_type{group_name}, group_type{});
+							const auto group_it					 = workaround_emplace_result.first;
+							const auto group_inserted			 = workaround_emplace_result.second;
+#else
 							const auto [group_it, group_inserted] = out.emplace(key_type{group_name}, group_type{});
+#endif
+
 							return {
 									.name = group_it->first,
 									.kv_appender =
