@@ -520,9 +520,15 @@ namespace
 
 			constexpr static auto				whitespace = dsl::ascii::blank;
 
-			constexpr static auto				rule	   = dsl::terminator(dsl::eof).opt_list(dsl::p<group_declaration<State, CommentRequired>>);
+			constexpr static auto				rule =
+					dsl::terminator(dsl::eof)
+							.opt_list(
+									dsl::try_(
+											dsl::p<group_declaration<State, CommentRequired>>,
+											// ignore this line if an error raised
+											dsl::until(dsl::newline)));
 
-			constexpr static auto				value	   = lexy::forward<void>;
+			constexpr static auto value = lexy::forward<void>;
 		};
 	}// namespace grammar
 
