@@ -242,7 +242,7 @@ namespace
 			};
 
 			flush_to_file<context_type>(
-					"TEST_INI_FLUSHER_FILE_PATH.ini",
+					TEST_INI_FLUSHER_FILE_PATH,
 					group_handle<char_type>{
 							.contains =
 									group_contains_type<char_type>{
@@ -319,7 +319,7 @@ namespace
 		auto& extract_result				 = workaround_extract_result_data.first;
 		auto& extract_data					 = workaround_extract_result_data.second;
 #else
-		auto [extract_result, extract_data] = extract_from_file<context_type>("TEST_INI_FLUSHER_FILE_PATH.ini");
+		auto [extract_result, extract_data] = extract_from_file<context_type>(TEST_INI_FLUSHER_FILE_PATH);
 #endif
 
 		"extract_ok"_test = [extract_result]
