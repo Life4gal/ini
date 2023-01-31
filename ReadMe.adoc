@@ -7,8 +7,7 @@ Life4gal <Life4gal@gmail.com>
 
 `ini` is a simple and easy to use `ini file` parser for C++.
 
-- Supports for reading ini files with comments.
-- Supports reading comments together.
+- Does not depend on any type and does not assume the type of data passed in by the user.
 - Supports writing the read data back to the file without losing the original comments of the file.
 - Supports writing data back to the file in the order it was read. (Newly added data is not guaranteed.)
 
@@ -19,12 +18,12 @@ The front-end implementation of the parser is based on the https://github.com/fo
 == Usage
 
 // on github :(
-https://github.com/Life4gal/ini/blob/9a78b53d13833d94ee5188fe392909104dce6835/unit_test/src/test_flusher.cpp#L36-L372
+https://github.com/Life4gal/ini/blob/9a78b53d13833d94ee5188fe392909104dce6835/unit_test/src/test_flusher.cpp#L36-L377
 
 // on IDE :)
 [source, c++]
 ----
-include::unit_test/src/test_flusher.cpp[]
+include::https://github.com/Life4gal/ini/blob/cdde47a2d7f9f12f2f747f188720f955e5c301c5/unit_test/src/test_flusher.cpp[]
 ----
 
 == License
