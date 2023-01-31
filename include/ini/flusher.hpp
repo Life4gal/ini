@@ -276,7 +276,7 @@ namespace gal::ini
 				group_handle<char_type>{
 						.contains =
 								group_contains_type<char_type>{
-										[&group_view, &kv_contains, &kv_flush, &kv_flush_remaining](string_view_t<key_type> group_name) -> bool
+										[&group_view](string_view_t<key_type> group_name) -> bool
 										{
 											return group_view.contains(group_name);
 										}},
