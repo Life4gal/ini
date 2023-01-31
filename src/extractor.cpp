@@ -555,10 +555,10 @@ namespace gal::ini::extractor_detail
 {
 	namespace
 	{
-		template<typename State, typename Char>
+		template<typename State>
 		[[nodiscard]] auto extract_from_file(
-				std::string_view		file_path,
-				group_append_type<Char> group_appender) -> ExtractResult
+				std::string_view							 file_path,
+				group_append_type<typename State::char_type> group_appender) -> ExtractResult
 		{
 			std::filesystem::path path{file_path};
 			if (!exists(path))
@@ -599,6 +599,19 @@ namespace gal::ini::extractor_detail
 				return ExtractResult::SUCCESS;
 			}
 		}
+
+		template<typename State>
+		[[nodiscard]] auto extract_from_buffer(
+				std::basic_string_view<typename State::char_type> buffer,
+				group_append_type<typename State::char_type>	  group_appender) -> ExtractResult
+		{
+			// todo: file_path?
+			State state{{buffer.data(), buffer.size()}, "Anonymous-Buffer", group_appender};
+
+			extract(state);
+
+			return ExtractResult::SUCCESS;
+		}
 	}// namespace
 
 	// char
@@ -616,18 +629,18 @@ namespace gal::ini::extractor_detail
 	}
 
 	// wchar_t
-	// [[nodiscard]] auto extract_from_file(
-	// 		std::string_view		   file_path,
-	// 		group_append_type<wchar_t> group_appender) -> ExtractResult
-	// {
-	// 	using char_type = wchar_t;
-	// 	// todo: encoding?
-	// 	using encoding	= lexy::utf32_encoding;
-
-	// 	return extract_from_file<ExtractorState<char_type, group_append_type<char_type>, kv_append_type<char_type>, encoding>>(
-	// 			file_path,
-	// 			group_appender);
-	// }
+	//	 [[nodiscard]] auto extract_from_file(
+	//	 		std::string_view		   file_path,
+	//	 		group_append_type<wchar_t> group_appender) -> ExtractResult
+	//	 {
+	//	 	using char_type = wchar_t;
+	//	 	// todo: encoding?
+	//	 	using encoding	= lexy::utf32_encoding;
+	//
+	//	 	return extract_from_file<ExtractorState<char_type, group_append_type<char_type>, kv_append_type<char_type>, encoding>>(
+	//	 			file_path,
+	//	 			group_appender);
+	//	 }
 
 	// char8_t
 	[[nodiscard]] auto extract_from_file(
@@ -665,6 +678,73 @@ namespace gal::ini::extractor_detail
 
 		return extract_from_file<ExtractorState<char_type, group_append_type<char_type>, kv_append_type<char_type>, encoding>>(
 				file_path,
+				group_appender);
+	}
+
+	// char
+	[[nodiscard]] auto extract_from_buffer(
+			std::basic_string_view<char> buffer,
+			group_append_type<char>		 group_appender) -> ExtractResult
+	{
+		using char_type = char;
+		// todo: encoding?
+		using encoding	= lexy::utf8_char_encoding;
+
+		return extract_from_buffer<ExtractorState<char_type, group_append_type<char_type>, kv_append_type<char_type>, encoding>>(
+				buffer,
+				group_appender);
+	}
+
+	// wchar_t
+	//	[[nodiscard]] auto extract_from_buffer(
+	//			std::basic_string_view<wchar_t> buffer,
+	//			group_append_type<wchar_t>		group_appender) -> ExtractResult
+	//	{
+	//		using char_type = wchar_t;
+	//		// todo: encoding?
+	//		using encoding	= lexy::utf32_encoding;
+	//
+	//		return extract_from_buffer<ExtractorState<char_type, group_append_type<char_type>, kv_append_type<char_type>, encoding>>(
+	//				buffer,
+	//				group_appender);
+	//	}
+
+	// char8_t
+	[[nodiscard]] auto extract_from_buffer(
+			std::basic_string_view<char8_t> buffer,
+			group_append_type<char8_t>		group_appender) -> ExtractResult
+	{
+		using char_type = char8_t;
+		using encoding	= lexy::deduce_encoding<char_type>;
+
+		return extract_from_buffer<ExtractorState<char_type, group_append_type<char_type>, kv_append_type<char_type>, encoding>>(
+				buffer,
+				group_appender);
+	}
+
+	// char16_t
+	[[nodiscard]] auto extract_from_buffer(
+			std::basic_string_view<char16_t> buffer,
+			group_append_type<char16_t>		 group_appender) -> ExtractResult
+	{
+		using char_type = char16_t;
+		using encoding	= lexy::deduce_encoding<char_type>;
+
+		return extract_from_buffer<ExtractorState<char_type, group_append_type<char_type>, kv_append_type<char_type>, encoding>>(
+				buffer,
+				group_appender);
+	}
+
+	// char32_t
+	[[nodiscard]] auto extract_from_buffer(
+			std::basic_string_view<char32_t> buffer,
+			group_append_type<char32_t>		 group_appender) -> ExtractResult
+	{
+		using char_type = char32_t;
+		using encoding	= lexy::deduce_encoding<char_type>;
+
+		return extract_from_buffer<ExtractorState<char_type, group_append_type<char_type>, kv_append_type<char_type>, encoding>>(
+				buffer,
 				group_appender);
 	}
 }// namespace gal::ini::extractor_detail

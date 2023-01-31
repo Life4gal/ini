@@ -202,6 +202,31 @@ namespace gal::ini
 		[[nodiscard]] auto extract_from_file(
 				std::string_view			file_path,
 				group_append_type<char32_t> group_appender) -> ExtractResult;
+
+		// char
+		[[nodiscard]] auto extract_from_buffer(
+				std::basic_string_view<char> buffer,
+				group_append_type<char>		 group_appender) -> ExtractResult;
+
+		// wchar_t
+		[[nodiscard]] auto extract_from_buffer(
+				std::basic_string_view<wchar_t> buffer,
+				group_append_type<wchar_t>		group_appender) -> ExtractResult;
+
+		// char8_t
+		[[nodiscard]] auto extract_from_buffer(
+				std::basic_string_view<char8_t> buffer,
+				group_append_type<char8_t>		group_appender) -> ExtractResult;
+
+		// char16_t
+		[[nodiscard]] auto extract_from_buffer(
+				std::basic_string_view<char16_t> buffer,
+				group_append_type<char16_t>		 group_appender) -> ExtractResult;
+
+		// char32_t
+		[[nodiscard]] auto extract_from_buffer(
+				std::basic_string_view<char32_t> buffer,
+				group_append_type<char32_t>		 group_appender) -> ExtractResult;
 	}// namespace extractor_detail
 
 	/**
@@ -260,5 +285,82 @@ namespace gal::ini
 													}},
 									.inserted = group_inserted};
 						}});
+	}
+
+	template<typename ContextType>
+	auto extract_from_file(std::string_view file_path) -> std::pair<ExtractResult, ContextType>
+	{
+		ContextType out{};
+		const auto	result = extract_from_file<ContextType>(file_path, out);
+		return {result, out};
+	}
+
+	/**
+	 * @brief Extract ini data from buffer.
+	 * @tparam ContextType Type of the output data.
+	 * @param buffer The buffer.
+	 * @param group_appender How to add a new group.
+	 * @return Extract result.
+	 */
+	template<typename ContextType>
+	auto extract_from_buffer(
+			std::basic_string_view<typename string_view_t<typename ContextType::key_type>::value_type> buffer,
+			group_append_type<typename string_view_t<typename ContextType::key_type>::value_type>	   group_appender) -> ExtractResult
+	{
+		return extractor_detail::extract_from_buffer(
+				buffer,
+				group_appender);
+	}
+
+	/**
+	 * @brief Extract ini data from buffer.
+	 * @tparam ContextType Type of the output data.
+	 * @param buffer The buffer.
+	 * @param out Where the extracted data is stored.
+	 * @return Extract result.
+	 */
+	template<typename ContextType>
+	auto extract_from_buffer(
+			std::basic_string_view<typename string_view_t<typename ContextType::key_type>::value_type> buffer,
+			ContextType&																			   out) -> ExtractResult
+	{
+		using context_type			 = ContextType;
+
+		using key_type				 = context_type::key_type;
+		using group_type			 = context_type::mapped_type;
+
+		using group_key_type		 = group_type::key_type;
+		using group_mapped_type		 = group_type::mapped_type;
+
+		using char_type				 = typename string_view_t<key_type>::value_type;
+		using this_kv_append_type	 = kv_append_type<char_type>;
+		using this_group_append_type = group_append_type<char_type>;
+
+		return extract_from_buffer<ContextType>(
+				buffer,
+				this_group_append_type{
+						[&out](string_view_t<key_type> group_name) -> group_append_result<char_type>
+						{
+							const auto [group_it, group_inserted] = out.emplace(key_type{group_name}, group_type{});
+							return {
+									.name = group_it->first,
+									.kv_appender =
+											this_kv_append_type{
+													[group_it](const string_view_t<group_key_type> key, const string_view_t<group_mapped_type> value) -> std::pair<std::pair<string_view_t<group_key_type>, string_view_t<group_mapped_type>>, bool>
+													{
+														const auto [kv_it, kv_inserted] = group_it->second.emplace(group_key_type{key}, group_mapped_type{value});
+														return {{kv_it->first, kv_it->second}, kv_inserted};
+													}},
+									.inserted = group_inserted};
+						}});
+	}
+
+	template<typename ContextType>
+	auto extract_from_buffer(
+			std::basic_string_view<typename string_view_t<typename ContextType::key_type>::value_type> buffer) -> std::pair<ExtractResult, ContextType>
+	{
+		ContextType out{};
+		const auto	result = extract_from_buffer<ContextType>(buffer, out);
+		return {result, out};
 	}
 }// namespace gal::ini
