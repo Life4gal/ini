@@ -14,12 +14,18 @@ using namespace gal::ini;
 #define GROUP4_NAME "group4 }{}{}{}{}{}{()()()())[[[[[[["
 #define GROUP5_NAME "group5 LKGP&ITIG&PG"
 
+#if defined(GAL_INI_COMPILER_APPLE_CLANG) || defined(GAL_INI_COMPILER_CLANG_CL) || defined(GAL_INI_COMPILER_CLANG)
+	#define GAL_INI_NO_DESTROY [[clang::no_destroy]]
+#else
+	#define GAL_INI_NO_DESTROY
+#endif
+
 namespace
 {
-	using group_type															  = std::unordered_map<std::string, std::string>;
-	using context_type															  = std::unordered_map<std::string, group_type>;
+	using group_type														   = std::unordered_map<std::string, std::string>;
+	using context_type														   = std::unordered_map<std::string, group_type>;
 
-	[[clang::no_destroy]] [[maybe_unused]] suite test_ini_extractor_generate_file = []
+	GAL_INI_NO_DESTROY [[maybe_unused]] suite test_ini_extractor_generate_file = []
 	{
 		const std::filesystem::path file_path{TEST_INI_EXTRACTOR_FILE_PATH};
 
@@ -136,7 +142,7 @@ namespace
 		};
 	};
 
-	[[clang::no_destroy]] [[maybe_unused]] suite test_ini_extractor_extract_from_file = []
+	GAL_INI_NO_DESTROY [[maybe_unused]] suite test_ini_extractor_extract_from_file = []
 	{
 #if defined(GAL_INI_COMPILER_APPLE_CLANG) || defined(GAL_INI_COMPILER_CLANG_CL) || defined(GAL_INI_COMPILER_CLANG)
 		auto  workaround_extract_result_data = extract_from_file<context_type>(TEST_INI_EXTRACTOR_FILE_PATH);
@@ -149,7 +155,7 @@ namespace
 		check_extract_result(extract_result, data);
 	};
 
-	[[clang::no_destroy]] [[maybe_unused]] suite test_ini_extractor_extract_from_buffer = []
+	GAL_INI_NO_DESTROY [[maybe_unused]] suite test_ini_extractor_extract_from_buffer = []
 	{
 		std::ifstream file{TEST_INI_EXTRACTOR_FILE_PATH, std::ios::in};
 		expect((file.is_open()) >> fatal);
@@ -174,5 +180,4 @@ namespace
 
 		check_extract_result(extract_result, data);
 	};
-
 }// namespace
