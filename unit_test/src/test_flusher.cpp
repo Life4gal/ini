@@ -193,7 +193,7 @@ namespace
 						<< key
 						<< blank_separator<group_key_type> << kv_separator<group_key_type> << blank_separator<group_key_type> << value
 						// write something random, for demonstration purposes only, this content is considered a comment.
-						<< "# foo bar baz here";
+						<< " # foo bar baz here";
 			};
 
 			// We need the following two temporary variables to hold some necessary information, and they must have a longer lifetime than the incoming StackFunction.
