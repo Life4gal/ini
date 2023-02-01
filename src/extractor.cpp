@@ -1,6 +1,4 @@
-#include <algorithm>
 #include <filesystem>
-#include <functional>
 #include <ini/extractor.hpp>
 #include <lexy/action/parse.hpp>
 #include <lexy/action/trace.hpp>
@@ -9,10 +7,9 @@
 #include <lexy/input/file.hpp>
 #include <lexy/input/string_input.hpp>
 #include <lexy_ext/report_error.hpp>
-#include <memory>
 #include <utility>
 
-//#define GAL_INI_TRACE_EXTRACT
+#define GAL_INI_TRACE_EXTRACT
 
 #ifdef GAL_INI_TRACE_EXTRACT
 	#include <lexy/visualize.hpp>
@@ -353,7 +350,12 @@ namespace
 			constexpr static auto				rule = []
 			{
 				// begin with not '\r', '\n', '\r\n', whitespace or '='
-				constexpr auto begin_with_not_blank	   = dsl::unicode::print - dsl::unicode::newline - dsl::unicode::blank - dsl::equal_sign;
+				constexpr auto begin_with_not_blank =
+						dsl::unicode::print - dsl::unicode::newline - dsl::unicode::blank - dsl::equal_sign
+						// todo: we need a better way to support the possible addition of comment formats in the future.
+						// see also: variable_or_comment::rule -> dsl::peek(...)
+						- dsl::lit_c<comment_hash_sign<State, false>::indication> - dsl::lit_c<comment_semicolon<State, false>::indication>;
+
 				// continue with printable, but excluding '\r', '\n', '\r\n', whitespace and '='
 				constexpr auto continue_with_printable = dsl::unicode::print - dsl::unicode::newline - dsl::unicode::blank - dsl::equal_sign;
 
