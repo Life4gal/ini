@@ -222,7 +222,7 @@ target_compile_options(
 		PRIVATE
 		${${PROJECT_NAME_PREFIX}COMPILE_FLAGS}
 )
-message("SIMULATE --> ${CMAKE_CXX_SIMULATE_ID}")
+
 # SET DEFINITIONS
 target_compile_definitions(
 		${PROJECT_NAME}
