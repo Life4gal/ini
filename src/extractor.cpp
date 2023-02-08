@@ -9,7 +9,7 @@
 #include <lexy_ext/report_error.hpp>
 #include <utility>
 
-#define GAL_INI_TRACE_EXTRACT
+//#define GAL_INI_TRACE_EXTRACT
 
 #ifdef GAL_INI_TRACE_EXTRACT
 	#include <lexy/visualize.hpp>
