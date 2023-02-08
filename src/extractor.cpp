@@ -568,8 +568,7 @@ namespace gal::ini::extractor_detail
 				std::string_view							 file_path,
 				group_append_type<typename State::char_type> group_appender) -> ExtractResult
 		{
-			std::filesystem::path path{file_path};
-			if (!exists(path))
+			if (!std::filesystem::exists(file_path))
 			{
 				return ExtractResult::FILE_NOT_FOUND;
 			}
@@ -623,8 +622,8 @@ namespace gal::ini::extractor_detail
 
 	// char
 	[[nodiscard]] auto extract_from_file(
-			std::string_view		file_path,
-			group_append_type<char> group_appender) -> ExtractResult
+			const std::string_view		  file_path,
+			const group_append_type<char> group_appender) -> ExtractResult
 	{
 		using char_type = char;
 		// todo: encoding?
@@ -637,8 +636,8 @@ namespace gal::ini::extractor_detail
 
 	// wchar_t
 	//	 [[nodiscard]] auto extract_from_file(
-	//	 		std::string_view		   file_path,
-	//	 		group_append_type<wchar_t> group_appender) -> ExtractResult
+	//	 		const std::string_view		   file_path,
+	//	 		const group_append_type<wchar_t> group_appender) -> ExtractResult
 	//	 {
 	//	 	using char_type = wchar_t;
 	//	 	// todo: encoding?
@@ -651,8 +650,8 @@ namespace gal::ini::extractor_detail
 
 	// char8_t
 	[[nodiscard]] auto extract_from_file(
-			std::string_view		   file_path,
-			group_append_type<char8_t> group_appender) -> ExtractResult
+			const std::string_view			 file_path,
+			const group_append_type<char8_t> group_appender) -> ExtractResult
 	{
 		using char_type = char8_t;
 		using encoding	= lexy::deduce_encoding<char_type>;
@@ -664,8 +663,8 @@ namespace gal::ini::extractor_detail
 
 	// char16_t
 	[[nodiscard]] auto extract_from_file(
-			std::string_view			file_path,
-			group_append_type<char16_t> group_appender) -> ExtractResult
+			const std::string_view			  file_path,
+			const group_append_type<char16_t> group_appender) -> ExtractResult
 	{
 		using char_type = char16_t;
 		using encoding	= lexy::deduce_encoding<char_type>;
@@ -677,8 +676,8 @@ namespace gal::ini::extractor_detail
 
 	// char32_t
 	[[nodiscard]] auto extract_from_file(
-			std::string_view			file_path,
-			group_append_type<char32_t> group_appender) -> ExtractResult
+			const std::string_view			  file_path,
+			const group_append_type<char32_t> group_appender) -> ExtractResult
 	{
 		using char_type = char32_t;
 		using encoding	= lexy::deduce_encoding<char_type>;
@@ -690,8 +689,8 @@ namespace gal::ini::extractor_detail
 
 	// char
 	[[nodiscard]] auto extract_from_buffer(
-			std::basic_string_view<char> buffer,
-			group_append_type<char>		 group_appender) -> ExtractResult
+			const std::basic_string_view<char> buffer,
+			const group_append_type<char> group_appender) -> ExtractResult
 	{
 		using char_type = char;
 		// todo: encoding?
@@ -704,8 +703,8 @@ namespace gal::ini::extractor_detail
 
 	// wchar_t
 	//	[[nodiscard]] auto extract_from_buffer(
-	//			std::basic_string_view<wchar_t> buffer,
-	//			group_append_type<wchar_t>		group_appender) -> ExtractResult
+	//			const std::basic_string_view<wchar_t> buffer,
+	//			const group_append_type<wchar_t>		group_appender) -> ExtractResult
 	//	{
 	//		using char_type = wchar_t;
 	//		// todo: encoding?
@@ -718,8 +717,8 @@ namespace gal::ini::extractor_detail
 
 	// char8_t
 	[[nodiscard]] auto extract_from_buffer(
-			std::basic_string_view<char8_t> buffer,
-			group_append_type<char8_t>		group_appender) -> ExtractResult
+			const std::basic_string_view<char8_t> buffer,
+			const group_append_type<char8_t> group_appender) -> ExtractResult
 	{
 		using char_type = char8_t;
 		using encoding	= lexy::deduce_encoding<char_type>;
@@ -731,8 +730,8 @@ namespace gal::ini::extractor_detail
 
 	// char16_t
 	[[nodiscard]] auto extract_from_buffer(
-			std::basic_string_view<char16_t> buffer,
-			group_append_type<char16_t>		 group_appender) -> ExtractResult
+			const std::basic_string_view<char16_t> buffer,
+			const group_append_type<char16_t> group_appender) -> ExtractResult
 	{
 		using char_type = char16_t;
 		using encoding	= lexy::deduce_encoding<char_type>;
@@ -744,8 +743,8 @@ namespace gal::ini::extractor_detail
 
 	// char32_t
 	[[nodiscard]] auto extract_from_buffer(
-			std::basic_string_view<char32_t> buffer,
-			group_append_type<char32_t>		 group_appender) -> ExtractResult
+			const std::basic_string_view<char32_t> buffer,
+			const group_append_type<char32_t> group_appender) -> ExtractResult
 	{
 		using char_type = char32_t;
 		using encoding	= lexy::deduce_encoding<char_type>;

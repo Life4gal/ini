@@ -47,6 +47,8 @@ auto main() -> int
 		}
 	}
 	{
+// see ReadMe --> `TODO`
+#if !defined(GAL_INI_COMPILER_CLANG)
 		std::cout << "======== CHAR8_T ========\n";
 
 		std::unordered_map<std::u8string, std::unordered_map<std::u8string, std::u8string>> context;
@@ -71,4 +73,5 @@ auto main() -> int
 
 		std::cout << "\n";
 	}
+#endif
 }

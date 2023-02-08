@@ -523,7 +523,7 @@ namespace
 	}// namespace grammar
 
 	template<typename State, typename Buffer>
-	auto flush(State& state, const Buffer& buffer, std::string_view file_path) -> void
+	auto flush(State& state, const Buffer& buffer, const std::string_view file_path) -> void
 	{
 #ifdef GAL_INI_TRACE_FLUSH
 		// This must come before the parse, because our handler is "non-reentrant".
@@ -554,8 +554,7 @@ namespace gal::ini::flusher_detail
 				std::string_view						file_path,
 				group_handle<typename State::char_type> group_handler) -> FlushResult
 		{
-			std::filesystem::path path{file_path};
-			if (!exists(path))
+			if (!std::filesystem::exists(file_path))
 			{
 				// The file doesn't exist, it doesn't matter, just write the file.
 				// return FlushResult::FILE_NOT_FOUND;
@@ -601,8 +600,8 @@ namespace gal::ini::flusher_detail
 
 	// char
 	[[nodiscard]] auto flush_to_file(
-			std::string_view   file_path,
-			group_handle<char> group_handler) -> FlushResult
+			const std::string_view	 file_path,
+			const group_handle<char> group_handler) -> FlushResult
 	{
 		using char_type = char;
 		// todo: encoding?
@@ -615,8 +614,8 @@ namespace gal::ini::flusher_detail
 
 	// wchar_t
 	//[[nodiscard]] auto flush_to_file(
-	//		std::string_view	  file_path,
-	//		group_handle<wchar_t> group_handler) -> FlushResult
+	//		const std::string_view	  file_path,
+	//		const group_handle<wchar_t> group_handler) -> FlushResult
 	//{
 	//	using char_type = wchar_t;
 	//	// todo: encoding?
@@ -629,8 +628,8 @@ namespace gal::ini::flusher_detail
 
 	// char8_t
 	[[nodiscard]] auto flush_to_file(
-			std::string_view	  file_path,
-			group_handle<char8_t> group_handler) -> FlushResult
+			const std::string_view		file_path,
+			const group_handle<char8_t> group_handler) -> FlushResult
 	{
 		using char_type = char8_t;
 		using encoding	= lexy::deduce_encoding<char_type>;
@@ -642,8 +641,8 @@ namespace gal::ini::flusher_detail
 
 	// char16_t
 	[[nodiscard]] auto flush_to_file(
-			std::string_view	   file_path,
-			group_handle<char16_t> group_handler) -> FlushResult
+			const std::string_view		 file_path,
+			const group_handle<char16_t> group_handler) -> FlushResult
 	{
 		using char_type = char16_t;
 		using encoding	= lexy::deduce_encoding<char_type>;
@@ -655,8 +654,8 @@ namespace gal::ini::flusher_detail
 
 	// char32_t
 	[[nodiscard]] auto flush_to_file(
-			std::string_view	   file_path,
-			group_handle<char32_t> group_handler) -> FlushResult
+			const std::string_view		 file_path,
+			const group_handle<char32_t> group_handler) -> FlushResult
 	{
 		using char_type = char32_t;
 		using encoding	= lexy::deduce_encoding<char_type>;

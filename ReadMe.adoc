@@ -27,3 +27,42 @@ include::https://github.com/Life4gal/ini/blob/cdde47a2d7f9f12f2f747f188720f955e5
 ----
 
 == License
+
+== TODO
+
+* MacOS
+[source, c++]
+----
+/Applications/Xcode_13.4.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX12.3.sdk/usr/include/c++/v1/fstream:312:33: error: implicit instantiation of undefined template 'std::codecvt<char8_t, char, __mbstate_t>'
+        __always_noconv_ = __cv_->always_noconv();
+                                ^
+/Applications/Xcode_13.4.1.app/../MacOSX12.3.sdk/usr/include/c++/v1/fstream:1353:14: note: in instantiation of member function 'std::basic_filebuf<char8_t>::basic_filebuf' requested here
+    explicit basic_ofstream(const char* __s, ios_base::openmode __mode = ios_base::out);
+             ^
+/Applications/Xcode_13.4.1.app/../MacOSX12.3.sdk/usr/include/c++/v1/fstream:1364:9: note: in instantiation of member function 'std::basic_ofstream<char8_t>::basic_ofstream' requested here
+      : basic_ofstream(__p.c_str(), __mode) {}
+        ^
+/Users/runner/work/ini/ini/src/flusher.cpp:70:6: note: in instantiation of member function 'std::basic_ofstream<char8_t>::basic_ofstream' requested here
+                          out_{temp_path_, std::ios::out | std::ios::trunc}
+----
+In order to minimize dependencies and not expose any dependent headers, we have to put the implementation in the source file. +
+This means that we cannot use any ``template``s (they must be `fully specialized`) and instead of customising a class to support output, we can just use `std::basic_ofstream` (which may later become std::basic_ostream to support output to buffer). +
+That is, we must `explicitly` specialize std::basic_ofstream for `all character types` (char/wchar_t/char8/16/32_t), and if the target platform does not support these specializations, it will not compile. (Maybe macro control can be added later?) +
+Perhaps it is also possible to write an abstract output interface class and ask the user to implement it? +
+
+* Linux & Clang-14
+[source, c++]
+----
+/usr/bin/ld: /usr/bin/ld: DWARF error: invalid or unhandled FORM value: 0x23
+standalone_test/CMakeFiles/ini-standalone-test.dir/src/main.cpp.o: in function `std::__cxx11::basic_string<char8_t, std::char_traits<char8_t>, std::allocator<char8_t> >::basic_string(char8_t const*, unsigned long, std::allocator<char8_t> const&)':
+main.cpp:(.text._ZNSt7__cxx1112basic_stringIDuSt11char_traitsIDuESaIDuEEC2EPKDumRKS3_[_ZNSt7__cxx1112basic_stringIDuSt11char_traitsIDuESaIDuEEC2EPKDumRKS3_]+0x89): undefined reference to `void std::__cxx11::basic_string<char8_t, std::char_traits<char8_t>, std::allocator<char8_t> >::_M_construct<char8_t const*>(char8_t const*, char8_t const*, std::forward_iterator_tag)'
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+----
+It looks like there is a problem with the `u8string` constructor in `Clang-14`, but after test, `Clang-15` has no such problem. Maybe we can get `GitHub Action` to compile with `Clang-15`?
+
+* Windows & MSVC
+[source, c++]
+----
+D:\a\ini\ini\include\ini/extractor.hpp(14): fatal error C1075: '{': no matching token found
+----
+It seems that `MSVC` is not reading the file content correctly, maybe it is caused by `EOL`? But all source files end with `CRLF` by default.
