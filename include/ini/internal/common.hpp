@@ -456,7 +456,7 @@ namespace gal::ini
 	{
 		using string_type = String;
 
-		CommentIndication							indication;
+		CommentIndication							indication{CommentIndication::INVALID};
 		string_view_t<string_type>					comment;
 
 		[[nodiscard]] constexpr auto				empty() const noexcept -> bool { return indication == CommentIndication::INVALID; }
@@ -471,7 +471,7 @@ namespace gal::ini
 	{
 		using string_type = String;
 
-		CommentIndication									   indication;
+		CommentIndication									   indication{CommentIndication::INVALID};
 		string_type											   comment;
 
 		[[nodiscard]] GAL_INI_STRING_CONSTEXPR auto			   empty() const noexcept -> bool { return comment.empty(); }
