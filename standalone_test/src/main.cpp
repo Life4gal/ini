@@ -72,6 +72,6 @@ auto main() -> int
 				});
 
 		std::cout << "\n";
-	}
 #endif
+	}
 }
