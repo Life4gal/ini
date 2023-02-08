@@ -1,8 +1,6 @@
-#include <algorithm>
+#include <cassert>
 #include <filesystem>
 #include <fstream>
-#include <functional>
-#include <ini/extractor.hpp>
 #include <ini/flusher.hpp>
 #include <lexy/action/parse.hpp>
 #include <lexy/action/trace.hpp>
@@ -11,9 +9,6 @@
 #include <lexy/input/file.hpp>
 #include <lexy/input/string_input.hpp>
 #include <lexy_ext/report_error.hpp>
-#include <memory>
-#include <unordered_set>
-#include <utility>
 
 //#define GAL_INI_TRACE_FLUSH
 
@@ -183,7 +178,8 @@ namespace
 				group_handle_type	 group_handle)
 			: file_{file_path},
 			  group_handle_{group_handle},
-			  kv_handle_{} {}
+			  kv_handle_{},
+			  last_comment_{} {}
 
 		FlusherState(const FlusherState&)					 = delete;
 		FlusherState(FlusherState&&)						 = delete;
@@ -200,6 +196,9 @@ namespace
 
 		auto			   comment(const comment_view_type comment) -> void
 		{
+			// todo: test?
+			assert((comment.indication == ini::CommentIndication::HASH_SIGN || comment.indication == ini::CommentIndication::SEMICOLON) && "INVALID_COMMENT");
+
 			last_comment_ = comment;
 		}
 
