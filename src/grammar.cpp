@@ -38,22 +38,21 @@ namespace gal::ini::grammar
 
 		using state_type		 = State;
 		using encoding			 = typename state_type::encoding;
-		using string_type		 = typename state_type::string_type;
-		using string_view_type	 = typename state_type::string_view_type;
+		using identifier_type	 = typename state_type::identifier_type;
 
-		using buffer_type		 = lexy::string_input<encoding>;
-		using buffer_anchor_type = lexy::input_location_anchor<buffer_type>;
-		using reader_type		 = decltype(std::declval<const buffer_type&>().reader());
-		using position_type		 = typename reader_type::iterator;
-		using lexeme_type		 = lexy::lexeme<reader_type>;
-		// using buffer_type		 = typename state_type::buffer_type;
-		// using buffer_anchor_type = typename state_type::buffer_anchor_type;
-		// using reader_type		 = typename state_type::reader_type;
-		// using position_type		 = typename state_type::position_type;
-		// using lexeme_type		 = typename state_type::lexeme_type;
+		// using buffer_type		 = lexy::string_input<encoding>;
+		// using buffer_anchor_type = lexy::input_location_anchor<buffer_type>;
+		// using reader_type		 = decltype(std::declval<const buffer_type&>().reader());
+		// using position_type		 = typename reader_type::iterator;
+		// using lexeme_type		 = lexy::lexeme<reader_type>;
+		using buffer_type		 = typename state_type::buffer_type;
+		using buffer_anchor_type = typename state_type::buffer_anchor_type;
+		using reader_type		 = typename state_type::reader_type;
+		using position_type		 = typename state_type::position_type;
+		using lexeme_type		 = typename state_type::lexeme_type;
 
 		static auto report_duplicate_declaration(
-				const string_type&				identifier,
+				const identifier_type			identifier,
 				const lexy_ext::diagnostic_kind kind,
 				const std::string_view			category,
 				const std::string_view			what_to_do,
@@ -135,23 +134,25 @@ namespace
 							// todo: multi-line comment
 							dsl::unicode::print - dsl::unicode::newline);
 
-			// constexpr static auto value = callback<void>(
-			// 		[](state_type& state, const typename error_reporter_type::lexeme_type lexeme) -> void
-			// 		{
-			// 			if constexpr (is_inline)
-			// 			{
-			// 				state.inline_comment(indication, typename error_reporter_type::string_view_type{lexeme.data(), lexeme.size()});
-			// 			}
-			// 			else
-			// 			{
-			// 				state.comment(indication, typename error_reporter_type::string_view_type{lexeme.data(), lexeme.size()});
-			// 			}
-			// 		});
-			constexpr static auto value = lexy::callback<std::pair<char_type, typename error_reporter_type::lexeme_type>>(
-					[](const typename error_reporter_type::lexeme_type lexeme) -> std::pair<char_type, typename error_reporter_type::lexeme_type>
-					{
-						return {indication, lexeme};
-					});
+			constexpr static auto value = []
+			{
+				if constexpr (is_inline)
+				{
+					return lexy::callback<std::pair<char_type, typename error_reporter_type::lexeme_type>>(
+							[](const typename error_reporter_type::lexeme_type lexeme) -> std::pair<char_type, typename error_reporter_type::lexeme_type>
+							{
+								return {indication, lexeme};
+							});
+				}
+				else
+				{
+					return callback<void>(
+							[](state_type& state, const typename error_reporter_type::lexeme_type lexeme) -> void
+							{
+								state.comment(indication, lexeme);
+							});
+				}
+			};
 		};
 
 		[[nodiscard]] CONSTEVAL static auto name() noexcept -> const char* { return "[comment]"; }
@@ -202,9 +203,9 @@ namespace
 	};
 
 	template<typename State>
-	using comment_hash_sign = comment<false, State, comment_indication_hash_sign<typename State::string_type>>;
+	using comment_hash_sign = comment<false, State, comment_indication_hash_sign<typename State::identifier_type>>;
 	template<typename State>
-	using comment_semicolon = comment<false, State, comment_indication_semicolon<typename State::string_type>>;
+	using comment_semicolon = comment<false, State, comment_indication_semicolon<typename State::identifier_type>>;
 
 	template<typename State>
 	constexpr auto comment_production =
