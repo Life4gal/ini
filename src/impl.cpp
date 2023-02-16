@@ -818,7 +818,7 @@ namespace
 		using position_type		  = typename error_reporter_type::position_type;
 		using lexeme_type		  = typename error_reporter_type::lexeme_type;
 
-		[[no_unique_address]] FlushFile<is_user_out, char_type> file_;
+		/* [[no_unique_address]] */ FlushFile<is_user_out, char_type> file_;
 
 		group_handle_type										group_handle_;
 		kv_handle_type											kv_handle_;
