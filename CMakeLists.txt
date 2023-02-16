@@ -9,12 +9,12 @@ set(
 
 set(
 		${PROJECT_NAME_PREFIX}MINOR_VERSION
-		2
+		3
 )
 
 set(
 		${PROJECT_NAME_PREFIX}PATCH_VERSION
-		6
+		1
 )
 
 set(${PROJECT_NAME_PREFIX}VERSION ${${PROJECT_NAME_PREFIX}MAJOR_VERSION}.${${PROJECT_NAME_PREFIX}MINOR_VERSION}.${${PROJECT_NAME_PREFIX}PATCH_VERSION})
@@ -183,7 +183,7 @@ set(
 
 		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/internal/common.hpp
 
-		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/group_accessor.hpp
+		#${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/group_accessor.hpp
 		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/extractor.hpp
 		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/flusher.hpp
 )
@@ -192,8 +192,7 @@ set(
 set(
 		${PROJECT_NAME_PREFIX}SOURCE
 
-		${PROJECT_SOURCE_DIR}/src/extractor.cpp
-		${PROJECT_SOURCE_DIR}/src/flusher.cpp
+		${PROJECT_SOURCE_DIR}/src/impl.cpp
 )
 
 # LIBRARY
