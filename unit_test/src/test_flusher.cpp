@@ -248,7 +248,7 @@ namespace
 
 			flush_to_file<context_type>(
 					TEST_INI_FLUSHER_FILE_PATH,
-					group_handle<char_type>{
+					group_ostream_handle<char_type>{
 							.contains =
 									group_contains_type<char_type>{
 											[&group_view](string_view_t<key_type> group_name) -> bool
@@ -263,8 +263,8 @@ namespace
 												return false;
 											}},
 							.flush =
-									group_flush_type<char_type>{
-											[&group_view, &kv_view, &kv_contains, &kv_flush, &kv_flush_remaining](std::basic_ostream<char_type>& out, const std::basic_string_view<char_type> group_name) -> kv_handle<char_type>
+									group_flush_ostream_type<char_type>{
+											[&group_view, &kv_view, &kv_contains, &kv_flush, &kv_flush_remaining](std::basic_ostream<char_type>& out, const std::basic_string_view<char_type> group_name) -> kv_ostream_handle<char_type>
 											{
 												if (const auto group_it = group_view.find(group_name);
 													group_it != group_view.end())
@@ -291,7 +291,7 @@ namespace
 												return {};
 											}},
 							.flush_remaining =
-									group_flush_remaining_type<char_type>{
+									group_flush_remaining_ostream_type<char_type>{
 											[&group_view](std::basic_ostream<char_type>& out) -> void
 											{
 												for (const auto& group: group_view)
@@ -374,4 +374,51 @@ namespace
 		};
 	};
 
+	GAL_INI_NO_DESTROY [[maybe_unused]] suite test_ini_flusher_flush_to_user = []
+	{
+		using key_type	= context_type::key_type;
+		using char_type = typename string_view_t<key_type>::value_type;
+
+		key_type buffer{};
+
+		{
+			class MyOut final : public UserOut<char_type>
+			{
+			public:
+				using out_type = key_type;
+
+			private:
+				out_type& out_;
+
+			public:
+				explicit MyOut(out_type& out) : out_{out} {}
+
+				constexpr auto operator<<(const char_type d) -> UserOut& override
+				{
+					out_.push_back(d);
+					return *this;
+				}
+
+				constexpr auto operator<<(const std::basic_string_view<char_type> d) -> UserOut& override
+				{
+					out_.append(d);
+					return *this;
+				}
+			};
+
+			MyOut out{buffer};
+
+			flush_to_user(TEST_INI_FLUSHER_FILE_PATH, data, out);
+
+#if defined(GAL_INI_COMPILER_APPLE_CLANG) || defined(GAL_INI_COMPILER_CLANG_CL) || defined(GAL_INI_COMPILER_CLANG)
+			auto  workaround_extract_result_data = extract_from_buffer<context_type>(buffer);
+			auto& extract_result				 = workaround_extract_result_data.first;
+			auto& extract_data					 = workaround_extract_result_data.second;
+#else
+			auto [extract_result, extract_data] = extract_from_buffer<context_type>(buffer);
+#endif
+
+			check_initial_data(extract_result, extract_data);
+		}
+	};
 }// namespace
