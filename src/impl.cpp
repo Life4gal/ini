@@ -1242,7 +1242,7 @@ namespace gal::ini
 		namespace
 		{
 			template<typename State>
-			[[nodiscard]] auto do_flush_to_file(
+			[[nodiscard]] auto do_flush(
 					std::string_view				  file_path,
 					typename State::group_handle_type group_handler) -> FlushResult
 			{
@@ -1299,7 +1299,7 @@ namespace gal::ini
 			// todo: encoding?
 			using encoding	= lexy::utf8_char_encoding;
 
-			return do_flush_to_file<Flusher<encoding, group_ostream_handle<char_type>, kv_ostream_handle<char_type>, false>>(
+			return do_flush<Flusher<encoding, group_ostream_handle<char_type>, kv_ostream_handle<char_type>, false>>(
 					file_path,
 					group_handler);
 		}
@@ -1313,7 +1313,7 @@ namespace gal::ini
 		//	// todo: encoding?
 		//	using encoding	= lexy::utf32_encoding;
 
-		//	return do_flush_to_file<Flusher<encoding, group_ostream_handle<char_type>, kv_ostream_handle<char_type>, false>>(
+		//	return do_flush<Flusher<encoding, group_ostream_handle<char_type>, kv_ostream_handle<char_type>, false>>(
 		//			file_path,
 		//			group_handler);
 		//}
@@ -1326,7 +1326,7 @@ namespace gal::ini
 			using char_type = char8_t;
 			using encoding	= lexy::deduce_encoding<char_type>;
 
-			return do_flush_to_file<Flusher<encoding, group_ostream_handle<char_type>, kv_ostream_handle<char_type>, false>>(
+			return do_flush<Flusher<encoding, group_ostream_handle<char_type>, kv_ostream_handle<char_type>, false>>(
 					file_path,
 					group_handler);
 		}
@@ -1339,7 +1339,7 @@ namespace gal::ini
 			using char_type = char16_t;
 			using encoding	= lexy::deduce_encoding<char_type>;
 
-			return do_flush_to_file<Flusher<encoding, group_ostream_handle<char_type>, kv_ostream_handle<char_type>, false>>(
+			return do_flush<Flusher<encoding, group_ostream_handle<char_type>, kv_ostream_handle<char_type>, false>>(
 					file_path,
 					group_handler);
 		}
@@ -1352,13 +1352,13 @@ namespace gal::ini
 			using char_type = char32_t;
 			using encoding	= lexy::deduce_encoding<char_type>;
 
-			return do_flush_to_file<Flusher<encoding, group_ostream_handle<char_type>, kv_ostream_handle<char_type>, false>>(
+			return do_flush<Flusher<encoding, group_ostream_handle<char_type>, kv_ostream_handle<char_type>, false>>(
 					file_path,
 					group_handler);
 		}
 
 		// char
-		[[nodiscard]] auto flush_to_file(
+		[[nodiscard]] auto flush_to_user(
 				const std::string_view		  file_path,
 				const group_user_handle<char> group_handler) -> FlushResult
 		{
@@ -1366,13 +1366,13 @@ namespace gal::ini
 			// todo: encoding?
 			using encoding	= lexy::utf8_char_encoding;
 
-			return do_flush_to_file<Flusher<encoding, group_user_handle<char_type>, kv_user_handle<char_type>, true>>(
+			return do_flush<Flusher<encoding, group_user_handle<char_type>, kv_user_handle<char_type>, true>>(
 					file_path,
 					group_handler);
 		}
 
 		// wchar_t
-		//[[nodiscard]] auto flush_to_file(
+		//[[nodiscard]] auto flush_to_user(
 		//		const std::string_view	  file_path,
 		//		const group_user_handle<wchar_t> group_handler) -> FlushResult
 		//{
@@ -1380,46 +1380,46 @@ namespace gal::ini
 		//	// todo: encoding?
 		//	using encoding	= lexy::utf32_encoding;
 
-		//	return do_flush_to_file<Flusher<encoding, group_user_handle<char_type>, kv_user_handle<char_type>, true>>(
+		//	return do_flush<Flusher<encoding, group_user_handle<char_type>, kv_user_handle<char_type>, true>>(
 		//			file_path,
 		//			group_handler);
 		//}
 
 		// char8_t
-		[[nodiscard]] auto flush_to_file(
+		[[nodiscard]] auto flush_to_user(
 				const std::string_view			 file_path,
 				const group_user_handle<char8_t> group_handler) -> FlushResult
 		{
 			using char_type = char8_t;
 			using encoding	= lexy::deduce_encoding<char_type>;
 
-			return do_flush_to_file<Flusher<encoding, group_user_handle<char_type>, kv_user_handle<char_type>, true>>(
+			return do_flush<Flusher<encoding, group_user_handle<char_type>, kv_user_handle<char_type>, true>>(
 					file_path,
 					group_handler);
 		}
 
 		// char16_t
-		[[nodiscard]] auto flush_to_file(
+		[[nodiscard]] auto flush_to_user(
 				const std::string_view			  file_path,
 				const group_user_handle<char16_t> group_handler) -> FlushResult
 		{
 			using char_type = char16_t;
 			using encoding	= lexy::deduce_encoding<char_type>;
 
-			return do_flush_to_file<Flusher<encoding, group_user_handle<char_type>, kv_user_handle<char_type>, true>>(
+			return do_flush<Flusher<encoding, group_user_handle<char_type>, kv_user_handle<char_type>, true>>(
 					file_path,
 					group_handler);
 		}
 
 		// char32_t
-		[[nodiscard]] auto flush_to_file(
+		[[nodiscard]] auto flush_to_user(
 				const std::string_view			  file_path,
 				const group_user_handle<char32_t> group_handler) -> FlushResult
 		{
 			using char_type = char32_t;
 			using encoding	= lexy::deduce_encoding<char_type>;
 
-			return do_flush_to_file<Flusher<encoding, group_user_handle<char_type>, kv_user_handle<char_type>, true>>(
+			return do_flush<Flusher<encoding, group_user_handle<char_type>, kv_user_handle<char_type>, true>>(
 					file_path,
 					group_handler);
 		}

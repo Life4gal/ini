@@ -253,27 +253,27 @@ namespace gal::ini
 				group_ostream_handle<char32_t> group_handler) -> FlushResult;
 
 		// char
-		[[nodiscard]] auto flush_to_file(
+		[[nodiscard]] auto flush_to_user(
 				std::string_view		file_path,
 				group_user_handle<char> group_handler) -> FlushResult;
 
 		// wchar_t
-		// [[nodiscard]] auto flush_to_file(
+		// [[nodiscard]] auto flush_to_user(
 		// 		std::string_view		   file_path,
 		// 		group_user_handler<wchar_t> group_handler) -> FlushResult;
 
 		// char8_t
-		[[nodiscard]] auto flush_to_file(
+		[[nodiscard]] auto flush_to_user(
 				std::string_view		   file_path,
 				group_user_handle<char8_t> group_handler) -> FlushResult;
 
 		// char16_t
-		[[nodiscard]] auto flush_to_file(
+		[[nodiscard]] auto flush_to_user(
 				std::string_view			file_path,
 				group_user_handle<char16_t> group_handler) -> FlushResult;
 
 		// char32_t
-		[[nodiscard]] auto flush_to_file(
+		[[nodiscard]] auto flush_to_user(
 				std::string_view			file_path,
 				group_user_handle<char32_t> group_handler) -> FlushResult;
 	}// namespace flusher_detail
@@ -300,7 +300,7 @@ namespace gal::ini
 			std::string_view																	  file_path,
 			group_user_handle<typename string_view_t<typename ContextType::key_type>::value_type> group_handler) -> FlushResult
 	{
-		return flusher_detail::flush_to_file(
+		return flusher_detail::flush_to_user(
 				file_path,
 				group_handler);
 	}
@@ -548,7 +548,7 @@ namespace gal::ini
 			kv_view.clear();
 		};
 
-		return flush_to_file<ContextType>(
+		return flush_to_user<ContextType>(
 				file_path,
 				group_user_handle<char_type>{
 						.user = [&user]() -> decltype(auto)
