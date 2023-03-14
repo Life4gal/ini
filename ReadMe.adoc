@@ -9,7 +9,8 @@ Life4gal <Life4gal@gmail.com>
 
 - Does not depend on any type and does not assume the type of data passed in by the user.
 - Supports writing the read data back to the file without losing the original comments of the file.
-- Supports writing data back to the file in the order it was read. (Newly added data is not guaranteed.)
+- Supports writing data back to the file in the order it was read.
+(Newly added data is not guaranteed.)
 
 == Requirements
 
@@ -17,21 +18,125 @@ The front-end implementation of the parser is based on the https://github.com/fo
 
 == Usage
 
-// on github :(
-https://github.com/Life4gal/ini/blob/9a78b53d13833d94ee5188fe392909104dce6835/unit_test/src/test_flusher.cpp#L36-L377
-
-// on IDE :)
-[source, c++]
+=== user-defined context type
+[source,c++]
 ----
-include::https://github.com/Life4gal/ini/blob/cdde47a2d7f9f12f2f747f188720f955e5c301c5/unit_test/src/test_flusher.cpp[]
+struct string_hasher
+{
+    using is_transparent = int;
+
+    template<typename String>
+    [[nodiscard]] constexpr auto operator()(const String& string) const noexcept -> std::size_t
+    {
+        if constexpr (std::is_array_v<String>)
+        {
+            return std::hash<std::basic_string_view<typename std::pointer_traits<std::decay_t<String>>::element_type>>{}(string);
+        }
+        else if constexpr (std::is_pointer_v<String>)
+        {
+            return std::hash<std::basic_string_view<typename std::pointer_traits<String>::element_type>>{}(string);
+        }
+        else if constexpr (requires { std::hash<String>{}; })
+        {
+            return std::hash<String>{}(string);
+        }
+        else
+        {
+            []<bool always_false = false> { static_assert(always_false, "Unsupported hash type!"); }
+            ();
+        }
+    }
+};
+
+using group_type = std::unordered_map<std::string, std::string, string_hasher, std::equal_to<>>;
+using context_type = std::unordered_map<std::string, group_type, string_hasher, std::equal_to<>>;
+
+auto [extract_result, data] = ini::extract_from_file<context_type>("config.ini");
+
+assert(extract_result == ini::ExtractResult::SUCCESS);
+assert(not data["properties"].empty());
+----
+
+=== Extract from buffer
+[source,c++]
+----
+using group_type = std::unordered_map<std::string, std::string, string_hasher, std::equal_to<>>;
+using context_type = std::unordered_map<std::string, group_type, string_hasher, std::equal_to<>>;
+
+std::ifstream file{"config.ini", std::ios::in};
+expect((file.is_open()) >> fatal);
+
+std::string buffer{};
+
+file.seekg(0, std::ios::end);
+buffer.reserve(file.tellg());
+file.seekg(0, std::ios::beg);
+
+buffer.assign(
+        std::istreambuf_iterator<char>(file),
+        std::istreambuf_iterator<char>());
+
+auto [extract_result, data] = ini::extract_from_buffer<context_type>(buffer);
+
+assert(extract_result == ini::ExtractResult::SUCCESS);
+assert(not data["properties"].empty());
+----
+
+=== Flush to user-defined type
+[source,c++]
+----
+using group_type = std::unordered_map<std::string, std::string, string_hasher, std::equal_to<>>;
+using context_type = std::unordered_map<std::string, group_type, string_hasher, std::equal_to<>>;
+
+context_type data{};
+
+// read data...
+
+using key_type	= context_type::key_type;
+using char_type = typename ini::string_view_t<key_type>::value_type;
+
+class MyOut final : public ini::UserOut<char_type>
+{
+public:
+    using out_type = key_type;
+
+private:
+    out_type& out_;
+
+public:
+    explicit MyOut(out_type& out) : out_{out} {}
+
+    /* constexpr */ auto operator<<(const char_type d) -> UserOut& override
+    {
+        out_.push_back(d);
+        return *this;
+    }
+
+    /* constexpr */ auto operator<<(const std::basic_string_view<char_type> d) -> UserOut& override
+    {
+        out_.append(d);
+        return *this;
+    }
+};
+
+key_type buffer{};
+MyOut out{buffer};
+
+// The file path is optional, if the file exists, write `out` in the order of the content in the file, otherwise the writing order is not guaranteed.(depends on the order of `context_type)
+ini::flush_to_user("config.ini", data, out);
+
+assert(not buffer.empty());
 ----
 
 == License
 
+See link:LICENSE[LICENSE].
+
 == TODO
 
 * MacOS
-[source, c++]
+
+[source,c++]
 ----
 /Applications/Xcode_13.4.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX12.3.sdk/usr/include/c++/v1/fstream:312:33: error: implicit instantiation of undefined template 'std::codecvt<char8_t, char, __mbstate_t>'
         __always_noconv_ = __cv_->always_noconv();
@@ -45,24 +150,32 @@ include::https://github.com/Life4gal/ini/blob/cdde47a2d7f9f12f2f747f188720f955e5
 /Users/runner/work/ini/ini/src/flusher.cpp:70:6: note: in instantiation of member function 'std::basic_ofstream<char8_t>::basic_ofstream' requested here
                           out_{temp_path_, std::ios::out | std::ios::trunc}
 ----
+
 In order to minimize dependencies and not expose any dependent headers, we have to put the implementation in the source file. +
 This means that we cannot use any ``template``s (they must be `fully specialized`) and instead of customising a class to support output, we can just use `std::basic_ofstream` (which may later become std::basic_ostream to support output to buffer). +
-That is, we must `explicitly` specialize std::basic_ofstream for `all character types` (char/wchar_t/char8/16/32_t), and if the target platform does not support these specializations, it will not compile. (Maybe macro control can be added later?) +
+That is, we must `explicitly` specialize std::basic_ofstream for `all character types` (char/wchar_t/char8/16/32_t), and if the target platform does not support these specializations, it will not compile.
+(Maybe macro control can be added later?) +
 Perhaps it is also possible to write an abstract output interface class and ask the user to implement it? +
 
 * Linux & Clang-14
-[source, c++]
+
+[source,c++]
 ----
 /usr/bin/ld: /usr/bin/ld: DWARF error: invalid or unhandled FORM value: 0x23
 standalone_test/CMakeFiles/ini-standalone-test.dir/src/main.cpp.o: in function `std::__cxx11::basic_string<char8_t, std::char_traits<char8_t>, std::allocator<char8_t> >::basic_string(char8_t const*, unsigned long, std::allocator<char8_t> const&)':
 main.cpp:(.text._ZNSt7__cxx1112basic_stringIDuSt11char_traitsIDuESaIDuEEC2EPKDumRKS3_[_ZNSt7__cxx1112basic_stringIDuSt11char_traitsIDuESaIDuEEC2EPKDumRKS3_]+0x89): undefined reference to `void std::__cxx11::basic_string<char8_t, std::char_traits<char8_t>, std::allocator<char8_t> >::_M_construct<char8_t const*>(char8_t const*, char8_t const*, std::forward_iterator_tag)'
 clang: error: linker command failed with exit code 1 (use -v to see invocation)
 ----
-It looks like there is a problem with the `u8string` constructor in `Clang-14`, but after test, `Clang-15` has no such problem. Maybe we can get `GitHub Action` to compile with `Clang-15`?
+
+It looks like there is a problem with the `u8string` constructor in `Clang-14`, but after test, `Clang-15` has no such problem.
+Maybe we can get `GitHub Action` to compile with `Clang-15`?
 
 * Windows & MSVC
-[source, c++]
+
+[source,c++]
 ----
 D:\a\ini\ini\include\ini/extractor.hpp(14): fatal error C1075: '{': no matching token found
 ----
-It seems that `MSVC` is not reading the file content correctly, maybe it is caused by `EOL`? But all source files end with `CRLF` by default.
+
+It seems that `MSVC` is not reading the file content correctly, maybe it is caused by `EOL`?
+But all source files end with `CRLF` by default.
