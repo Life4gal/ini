@@ -183,7 +183,6 @@ set(
 
 		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/internal/common.hpp
 
-		#${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/group_accessor.hpp
 		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/extractor.hpp
 		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/flusher.hpp
 )
