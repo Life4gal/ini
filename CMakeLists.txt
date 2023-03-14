@@ -33,7 +33,9 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake_utils/doc_var.cmake)
 # This should be done before the project command since the latter can set
 # CMAKE_BUILD_TYPE itself.
 if (${PROJECT_NAME_PREFIX}MASTER_PROJECT AND NOT CMAKE_BUILD_TYPE)
-	doc_var(
+	cmake_language(
+			CALL
+			${PROJECT_NAME_PREFIX}doc_var
 			CMAKE_BUILD_TYPE
 			RelWithDebInfo
 			STRING
@@ -81,7 +83,9 @@ else ()
 	message(FATAL_ERROR "Unsupported Platform: ${CMAKE_SYSTEM_NAME}")
 endif (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 
-doc_var(
+cmake_language(
+		CALL
+		${PROJECT_NAME_PREFIX}doc_var
 		${PROJECT_NAME_PREFIX}INSTALL_HEADERS
 		${CMAKE_INSTALL_INCLUDEDIR}
 		STRING
@@ -119,7 +123,9 @@ set(${PROJECT_NAME_PREFIX}COMPILER_VERSION ${CMAKE_CXX_COMPILER_VERSION})
 set(${PROJECT_NAME_PREFIX}COMPILER_NAME ${${PROJECT_NAME_PREFIX}COMPILER_ID}.${${PROJECT_NAME_PREFIX}COMPILER_VERSION})
 
 if (${PROJECT_NAME_PREFIX}MASTER_PROJECT AND NOT DEFINED CMAKE_CXX_VISIBILITY_PRESET)
-	doc_var(
+	cmake_language(
+			CALL
+			${PROJECT_NAME_PREFIX}doc_var
 			CMAKE_CXX_VISIBILITY_PRESET
 			hidden
 			STRING
