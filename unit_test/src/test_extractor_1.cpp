@@ -22,8 +22,35 @@ using namespace gal::ini;
 
 namespace
 {
-	using group_type														   = std::unordered_map<std::string, std::string>;
-	using context_type														   = std::unordered_map<std::string, group_type>;
+	struct string_hasher
+	{
+		using is_transparent = int;
+
+		template<typename String>
+		[[nodiscard]] constexpr auto operator()(const String& string) const noexcept -> std::size_t
+		{
+			if constexpr (std::is_array_v<String>)
+			{
+				return std::hash<std::basic_string_view<typename std::pointer_traits<std::decay_t<String>>::element_type>>{}(string);
+			}
+			else if constexpr (std::is_pointer_v<String>)
+			{
+				return std::hash<std::basic_string_view<typename std::pointer_traits<String>::element_type>>{}(string);
+			}
+			else if constexpr (requires { std::hash<String>{}; })
+			{
+				return std::hash<String>{}(string);
+			}
+			else
+			{
+				[]<bool always_false = false> { static_assert(always_false, "Unsupported hash type!"); }
+				();
+			}
+		}
+	};
+
+	using group_type														   = std::unordered_map<std::string, std::string, string_hasher, std::equal_to<>>;
+	using context_type														   = std::unordered_map<std::string, group_type, string_hasher, std::equal_to<>>;
 
 	GAL_INI_NO_DESTROY [[maybe_unused]] suite test_ini_extractor_generate_file = []
 	{
