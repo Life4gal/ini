@@ -61,29 +61,6 @@ namespace gal::ini
 		template<
 				template<typename>
 				typename Allocator,
-				typename Key,
-				typename Value>
-		struct map_allocator_type<Allocator<std::pair<const Key, Value>>>
-		{
-			template<typename NewKey, typename NewValue>
-			using type = Allocator<std::pair<const NewKey, NewValue>>;
-		};
-
-		template<
-				template<typename>
-				typename Allocator,
-				typename Key,
-				typename Value>
-		// There may be implementations of map that do not require the Key to be const. :)
-		struct map_allocator_type<Allocator<std::pair<Key, Value>>>
-		{
-			template<typename NewKey, typename NewValue>
-			using type = Allocator<std::pair<NewKey, NewValue>>;
-		};
-
-		template<
-				template<typename>
-				typename Allocator,
 				template<typename, typename>
 				typename Pair,
 				typename Key,
@@ -111,93 +88,237 @@ namespace gal::ini
 		template<typename T, typename NewKey, typename NewValue>
 		using map_allocator_type_t = typename map_allocator_type<T>::template type<NewKey, NewValue>;
 
-		template<typename T>
-		struct map_hash_type;
+		// non-template hasher
+		template<
+				typename Hash>
+		struct map_hash_type
+		{
+			template<typename NewKey>
+				requires std::is_invocable_v<Hash, const NewKey&>
+			using type = Hash;
+		};
 
 		template<
 				template<typename>
 				typename Hash,
 				typename Key>
+			requires std::is_invocable_v<Hash<Key>, const Key&>
 		struct map_hash_type<Hash<Key>>
 		{
 			template<typename NewKey>
+				requires std::is_invocable_v<Hash<NewKey>, const NewKey&>
 			using type = Hash<NewKey>;
 		};
 
 		template<typename T, typename NewKey>
 		using map_hash_type_t = typename map_hash_type<T>::template type<NewKey>;
 
-		template<typename T>
-		struct map_comparator_type;
+		// transparent
+		template<
+				typename KeyComparator>
+		struct map_key_comparator_type
+		{
+			template<typename NewKey>
+				requires std::is_invocable_v<KeyComparator, const NewKey&, const NewKey&>
+			using type = KeyComparator;
+		};
 
 		template<
 				template<typename>
-				typename Comparator,
+				typename KeyComparator,
 				typename Key>
-		struct map_comparator_type<Comparator<Key>>
+			requires std::is_invocable_v<KeyComparator<Key>, const Key&, const Key&>
+		struct map_key_comparator_type<KeyComparator<Key>>
 		{
 			template<typename NewKey>
-			using type = Comparator<NewKey>;
+				requires std::is_invocable_v<KeyComparator<NewKey>, const NewKey&, const NewKey&>
+			using type = KeyComparator<NewKey>;
 		};
 
 		template<typename T, typename NewKey>
-		using map_comparator_type_t = typename map_comparator_type<T>::template type<NewKey>;
+		using map_key_comparator_type_t = typename map_key_comparator_type<T>::template type<NewKey>;
 
 		template<typename T>
 		struct map_type;
 
 		template<
-				template<typename, typename, typename, typename, typename, typename...>
+				template<typename, typename, typename, typename, typename>
 				typename Map,
 				typename Key,
 				typename Value,
 				typename Hash,
 				typename KeyComparator,
-				typename Allocator,
-				typename... NeverMind>
-		struct map_type<Map<Key, Value, Hash, KeyComparator, Allocator, NeverMind...>>
+				typename Allocator>
+			requires requires {
+						 typename map_hash_type_t<Hash, Key>;
+						 typename map_key_comparator_type_t<KeyComparator, Key>;
+						 typename map_allocator_type_t<Allocator, Key, Value>;
+					 }
+		struct map_type<Map<Key, Value, Hash, KeyComparator, Allocator>>
 		{
-			template<typename NewKey, typename NewValue, typename NewHash = map_hash_type_t<Hash, NewKey>, typename NewKeyComparator = map_comparator_type_t<KeyComparator, NewKey>>
-			using type = Map<NewKey, NewValue, NewHash, NewKeyComparator, map_allocator_type_t<Allocator, NewKey, NewValue>, NeverMind...>;
+			template<
+					typename NewKey,
+					typename NewValue,
+					typename NewHash		  = map_hash_type_t<Hash, NewKey>,
+					typename NewKeyComparator = map_key_comparator_type_t<KeyComparator, NewKey>,
+					typename NewAllocator	  = map_allocator_type_t<Allocator, NewKey, NewValue>>
+				requires requires {
+							 typename map_hash_type_t<NewHash, NewKey>;
+							 typename map_key_comparator_type_t<NewKeyComparator, NewKey>;
+							 typename map_allocator_type_t<NewAllocator, NewKey, NewValue>;
+						 }
+			using type = Map<NewKey, NewValue, NewHash, NewKeyComparator, NewAllocator>;
 		};
 
 		template<
-				template<typename, typename, typename, typename, typename...>
+				template<typename, typename, typename, typename>
 				typename Map,
 				typename Key,
 				typename Value,
 				typename Hash,
-				typename Allocator,
-				typename... NeverMind>
-		struct map_type<Map<Key, Value, Hash, Allocator, NeverMind...>>
+				typename KeyComparator>
+			requires requires {
+						 typename map_hash_type_t<Hash, Key>;
+						 typename map_key_comparator_type_t<KeyComparator, Key>;
+					 }
+		struct map_type<Map<Key, Value, Hash, KeyComparator>>
 		{
-			template<typename NewKey, typename NewValue, typename NewHash = map_hash_type_t<Hash, NewKey>>
-			using type = Map<NewKey, NewValue, NewHash, map_allocator_type_t<Allocator, NewKey, NewValue>, NeverMind...>;
+			template<
+					typename NewKey,
+					typename NewValue,
+					typename NewHash		  = map_hash_type_t<Hash, NewKey>,
+					typename NewKeyComparator = map_key_comparator_type_t<KeyComparator, NewKey>>
+				requires requires {
+							 typename map_hash_type_t<NewHash, NewKey>;
+							 typename map_key_comparator_type_t<NewKeyComparator, NewKey>;
+						 }
+			using type = Map<NewKey, NewValue, NewHash, NewKeyComparator>;
 		};
 
 		template<
-				template<typename, typename, typename, typename...>
+				template<typename, typename, typename, typename>
 				typename Map,
 				typename Key,
 				typename Value,
-				typename Allocator,
-				typename... NeverMind>
-		struct map_type<Map<Key, Value, Allocator, NeverMind...>>
+				typename Hash,
+				typename Allocator>
+			requires requires {
+						 typename map_hash_type_t<Hash, Key>;
+						 typename map_allocator_type_t<Allocator, Key, Value>;
+					 }
+		struct map_type<Map<Key, Value, Hash, Allocator>>
 		{
-			template<typename NewKey, typename NewValue>
-			using type = Map<NewKey, NewValue, map_allocator_type_t<Allocator, NewKey, NewValue>, NeverMind...>;
+			template<
+					typename NewKey,
+					typename NewValue,
+					typename NewHash	  = map_hash_type_t<Hash, NewKey>,
+					typename NewAllocator = map_allocator_type_t<Allocator, NewKey, NewValue>>
+				requires requires {
+							 typename map_hash_type_t<NewHash, NewKey>;
+							 typename map_allocator_type_t<NewAllocator, NewKey, NewValue>;
+						 }
+			using type = Map<NewKey, NewValue, NewHash, NewAllocator>;
 		};
 
 		template<
-				template<typename, typename, typename, typename...>
+				template<typename, typename, typename>
 				typename Map,
 				typename Key,
 				typename Value,
-				typename... NeverMind>
-		struct map_type<Map<Key, Value, NeverMind...>>
+				typename Hash>
+			requires requires {
+						 typename map_hash_type_t<Hash, Key>;
+					 }
+		struct map_type<Map<Key, Value, Hash>>
 		{
-			template<typename NewKey, typename NewValue>
-			using type = Map<NewKey, NewValue, NeverMind...>;
+			template<
+					typename NewKey,
+					typename NewValue,
+					typename NewHash = map_hash_type_t<Hash, NewKey>>
+				requires requires {
+							 typename map_hash_type_t<NewHash, NewKey>;
+						 }
+			using type = Map<NewKey, NewValue, NewHash>;
+		};
+
+		template<
+				template<typename, typename, typename, typename>
+				typename Map,
+				typename Key,
+				typename Value,
+				typename KeyComparator,
+				typename Allocator>
+			requires requires {
+						 typename map_key_comparator_type_t<KeyComparator, Key>;
+						 typename map_allocator_type_t<Allocator, Key, Value>;
+					 }
+		struct map_type<Map<Key, Value, KeyComparator, Allocator>>
+		{
+			template<
+					typename NewKey,
+					typename NewValue,
+					typename NewKeyComparator = map_key_comparator_type_t<KeyComparator, NewKey>,
+					typename NewAllocator	  = map_allocator_type_t<Allocator, NewKey, NewValue>>
+				requires requires {
+							 typename map_key_comparator_type_t<NewKeyComparator, NewKey>;
+							 typename map_allocator_type_t<NewAllocator, NewKey, NewValue>;
+						 }
+			using type = Map<NewKey, NewValue, NewKeyComparator, NewAllocator>;
+		};
+
+		template<
+				template<typename, typename, typename>
+				typename Map,
+				typename Key,
+				typename Value,
+				typename KeyComparator>
+			requires requires {
+						 typename map_key_comparator_type_t<KeyComparator, Key>;
+					 }
+		struct map_type<Map<Key, Value, KeyComparator>>
+		{
+			template<
+					typename NewKey,
+					typename NewValue,
+					typename NewKeyComparator = map_key_comparator_type_t<KeyComparator, NewKey>>
+				requires requires {
+							 typename map_key_comparator_type_t<NewKeyComparator, NewKey>;
+						 }
+			using type = Map<NewKey, NewValue, NewKeyComparator>;
+		};
+
+		template<
+				template<typename, typename, typename>
+				typename Map,
+				typename Key,
+				typename Value,
+				typename Allocator>
+			requires requires {
+						 typename map_allocator_type_t<Allocator, Key, Value>;
+					 }
+		struct map_type<Map<Key, Value, Allocator>>
+		{
+			template<
+					typename NewKey,
+					typename NewValue,
+					typename NewAllocator = map_allocator_type_t<Allocator, NewKey, NewValue>>
+				requires requires {
+							 typename map_allocator_type_t<NewAllocator, NewKey, NewValue>;
+						 }
+			using type = Map<NewKey, NewValue, NewAllocator>;
+		};
+
+		template<
+				template<typename, typename>
+				typename Map,
+				typename Key,
+				typename Value>
+		struct map_type<Map<Key, Value>>
+		{
+			template<
+					typename NewKey,
+					typename NewValue>
+			using type = Map<NewKey, NewValue>;
 		};
 
 		template<typename T, typename... Required>
