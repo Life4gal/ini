@@ -16,19 +16,19 @@ using namespace gal::ini;
 #define GROUP5_NAME "group5 LKGP&ITIG&PG"
 
 #if defined(GAL_INI_COMPILER_APPLE_CLANG) || defined(GAL_INI_COMPILER_CLANG_CL) || defined(GAL_INI_COMPILER_CLANG)
-	#define GAL_INI_NO_DESTROY [[clang::no_destroy]]
+#define GAL_INI_NO_DESTROY [[clang::no_destroy]]
 #else
-	#define GAL_INI_NO_DESTROY
+#define GAL_INI_NO_DESTROY
 #endif
 
 #if !defined(GAL_INI_NO_DEBUG_FLUSH)
-	#if !defined(NODEBUG) && !defined(_NODEBUG)
-		#define GAL_INI_DEBUG_FLUSH_REQUIRED
-	#endif
+#if !defined(NODEBUG) && !defined(_NODEBUG)
+#define GAL_INI_DEBUG_FLUSH_REQUIRED
+#endif
 #endif
 
 #if defined(GAL_INI_DEBUG_FLUSH_REQUIRED)
-	#define GAL_INI_DEBUG_FLUSH_NEW_LINE std::endl
+#define GAL_INI_DEBUG_FLUSH_NEW_LINE std::endl
 #else
 	#define GAL_INI_DEBUG_FLUSH_NEW_LINE line_separator<std::basic_string_view<char_type>>
 #endif
@@ -42,30 +42,21 @@ namespace
 		template<typename String>
 		[[nodiscard]] constexpr auto operator()(const String& string) const noexcept -> std::size_t
 		{
-			if constexpr (std::is_array_v<String>)
-			{
-				return std::hash<std::basic_string_view<typename std::pointer_traits<std::decay_t<String>>::element_type>>{}(string);
-			}
-			else if constexpr (std::is_pointer_v<String>)
-			{
-				return std::hash<std::basic_string_view<typename std::pointer_traits<String>::element_type>>{}(string);
-			}
-			else if constexpr (requires { std::hash<String>{}; })
-			{
-				return std::hash<String>{}(string);
-			}
+			if constexpr (std::is_array_v<String>) { return std::hash<std::basic_string_view<typename std::pointer_traits<std::decay_t<String>>::element_type>>{}(string); }
+			else if constexpr (std::is_pointer_v<String>) { return std::hash<std::basic_string_view<typename std::pointer_traits<String>::element_type>>{}(string); }
+			else if constexpr (requires { std::hash<String>{}; }) { return std::hash<String>{}(string); }
 			else
 			{
-				[]<bool always_false = false> { static_assert(always_false, "Unsupported hash type!"); }
-				();
+				[]<bool AlwaysFalse = false> { static_assert(AlwaysFalse, "Unsupported hash type!"); }();
+				return 0;
 			}
 		}
 	};
 
-	using group_type   = std::unordered_map<std::string, std::string, string_hasher, std::equal_to<>>;
+	using group_type = std::unordered_map<std::string, std::string, string_hasher, std::equal_to<>>;
 	using context_type = std::unordered_map<std::string, group_type, string_hasher, std::equal_to<>>;
 
-	GAL_INI_NO_DESTROY context_type			  data{};
+	GAL_INI_NO_DESTROY context_type data{};
 
 	GAL_INI_NO_DESTROY [[maybe_unused]] suite test_ini_flusher_generate_data = []
 	{
@@ -94,13 +85,9 @@ namespace
 
 	auto check_initial_data = [](const ExtractResult extract_result, const context_type& this_data) -> void
 	{
-		"extract_ok"_test = [extract_result]
-		{
-			expect((extract_result == ExtractResult::SUCCESS) >> fatal);
-		};
+		"extract_ok"_test = [extract_result] { expect((extract_result == ExtractResult::SUCCESS) >> fatal); };
 
-		"group_size"_test = [&]
-		{ expect((this_data.size() == 5_i) >> fatal); };
+		"group_size"_test = [&] { expect((this_data.size() == 5_i) >> fatal); };
 
 		"group_name"_test = [&]
 		{
@@ -168,22 +155,19 @@ namespace
 		};
 	};
 
-	GAL_INI_NO_DESTROY [[maybe_unused]] suite test_ini_flusher_initial_data = []
-	{
-		check_initial_data(ExtractResult::SUCCESS, data);
-	};
+	GAL_INI_NO_DESTROY [[maybe_unused]] suite test_ini_flusher_initial_data = [] { check_initial_data(ExtractResult::SUCCESS, data); };
 
 	GAL_INI_NO_DESTROY [[maybe_unused]] suite test_ini_flusher_flush_to_file = []
 	{
 		flush_to_file(TEST_INI_FLUSHER_FILE_PATH, data);
 
-#if defined(GAL_INI_COMPILER_APPLE_CLANG) || defined(GAL_INI_COMPILER_CLANG_CL) || defined(GAL_INI_COMPILER_CLANG)
+		#if defined(GAL_INI_COMPILER_APPLE_CLANG) || defined(GAL_INI_COMPILER_CLANG_CL) || defined(GAL_INI_COMPILER_CLANG)
 		auto  workaround_extract_result_data = extract_from_file<context_type>(TEST_INI_FLUSHER_FILE_PATH);
-		auto& extract_result				 = workaround_extract_result_data.first;
-		auto& extract_data					 = workaround_extract_result_data.second;
-#else
+		auto& extract_result                 = workaround_extract_result_data.first;
+		auto& extract_data                   = workaround_extract_result_data.second;
+		#else
 		auto [extract_result, extract_data] = extract_from_file<context_type>(TEST_INI_FLUSHER_FILE_PATH);
-#endif
+		#endif
 
 		check_initial_data(extract_result, extract_data);
 	};
@@ -191,15 +175,15 @@ namespace
 	GAL_INI_NO_DESTROY [[maybe_unused]] suite test_ini_flusher_flush_to_file_keep_empty_group = []
 	{
 		{
-			using key_type							  = context_type::key_type;
+			using key_type = context_type::key_type;
 
-			using group_key_type					  = group_type::key_type;
-			using group_mapped_type					  = group_type::mapped_type;
+			using group_key_type = group_type::key_type;
+			using group_mapped_type = group_type::mapped_type;
 
-			using char_type							  = typename string_view_t<key_type>::value_type;
+			using char_type = typename string_view_t<key_type>::value_type;
 
-			using group_view_type					  = common::map_type_t<context_type, string_view_t<key_type>, const group_type*>;
-			using kv_view_type						  = common::map_type_t<group_type, string_view_t<group_key_type>, string_view_t<group_mapped_type>>;
+			using group_view_type = common::map_type_t<context_type, string_view_t<key_type>, const group_type*>;
+			using kv_view_type = common::map_type_t<group_type, string_view_t<group_key_type>, string_view_t<group_mapped_type>>;
 
 			constexpr static auto do_flush_group_head = [](std::basic_ostream<char_type>& out, const std::basic_string_view<char_type> group_name) -> void
 			{
@@ -229,10 +213,7 @@ namespace
 			auto group_view = [](const auto& gs) -> group_view_type
 			{
 				group_view_type vs{};
-				for (const auto& g: gs)
-				{
-					vs.emplace(g.first, &g.second);
-				}
+				for (const auto& g: gs) { vs.emplace(g.first, &g.second); }
 				return vs;
 			}(data);
 
@@ -240,13 +221,10 @@ namespace
 			kv_view_type kv_view{};
 
 			// see flusher.hpp::flush_to_file(std::string_view file_path, ContextType& in)
-			auto		 kv_contains =
-					[&kv_view](const string_view_t<group_key_type> key) -> bool
-			{
-				return kv_view.contains(key);
-			};
+			auto                                                   kv_contains =
+					[&kv_view](const string_view_t<group_key_type> key) -> bool { return kv_view.contains(key); };
 
-			auto kv_flush =
+			auto                                              kv_flush =
 					[&kv_view](std::basic_ostream<char_type>& out, const std::basic_string_view<char_type> key) -> void
 			{
 				if (const auto kv_it = kv_view.find(key);
@@ -260,7 +238,7 @@ namespace
 				// else, do nothing
 			};
 
-			auto kv_flush_remaining =
+			auto                                              kv_flush_remaining =
 					[&kv_view](std::basic_ostream<char_type>& out) -> void
 			{
 				for (const auto& kv: kv_view)
@@ -277,90 +255,77 @@ namespace
 					TEST_INI_FLUSHER_FILE_PATH,
 					group_ostream_handle<char_type>{
 							.contains =
-									group_contains_type<char_type>{
-											[&group_view](string_view_t<key_type> group_name) -> bool
-											{
-												// return group_view.contains(group_name);
-												// remove empty group
-												if (const auto group_it = group_view.find(group_name);
-													group_it != group_view.end())
-												{
-													return !group_it->second->empty();
-												}
-												return false;
-											}},
+							group_contains_type<char_type>{
+									[&group_view](string_view_t<key_type> group_name) -> bool
+									{
+										// return group_view.contains(group_name);
+										// remove empty group
+										if (const auto group_it = group_view.find(group_name);
+											group_it != group_view.end()) { return !group_it->second->empty(); }
+										return false;
+									}},
 							.flush =
-									group_flush_ostream_type<char_type>{
-											[&group_view, &kv_view, &kv_contains, &kv_flush, &kv_flush_remaining](std::basic_ostream<char_type>& out, const std::basic_string_view<char_type> group_name) -> kv_ostream_handle<char_type>
-											{
-												if (const auto group_it = group_view.find(group_name);
-													group_it != group_view.end())
-												{
-													// flush head
-													do_flush_group_head(out, group_name);
+							group_flush_ostream_type<char_type>{
+									[&group_view, &kv_view, &kv_contains, &kv_flush, &kv_flush_remaining](std::basic_ostream<char_type>& out, const std::basic_string_view<char_type> group_name) -> kv_ostream_handle<char_type>
+									{
+										if (const auto group_it = group_view.find(group_name);
+											group_it != group_view.end())
+										{
+											// flush head
+											do_flush_group_head(out, group_name);
 
-													// set current kvs view
-													for (const auto& kv: *group_it->second)
-													{
-														kv_view.emplace(kv.first, kv.second);
-													}
+											// set current kvs view
+											for (const auto& kv: *group_it->second) { kv_view.emplace(kv.first, kv.second); }
 
-													// remove this group from view
-													group_view.erase(group_name);
+											// remove this group from view
+											group_view.erase(group_name);
 
-													return {
-															.name			 = group_name,
-															.contains		 = kv_contains,
-															.flush			 = kv_flush,
-															.flush_remaining = kv_flush_remaining};
-												}
+											return {
+													.name = group_name,
+													.contains = kv_contains,
+													.flush = kv_flush,
+													.flush_remaining = kv_flush_remaining};
+										}
 
-												return {};
-											}},
+										return {};
+									}},
 							.flush_remaining =
-									group_flush_remaining_ostream_type<char_type>{
-											[&group_view](std::basic_ostream<char_type>& out) -> void
+							group_flush_remaining_ostream_type<char_type>{
+									[&group_view](std::basic_ostream<char_type>& out) -> void
+									{
+										for (const auto& group: group_view)
+										{
+											// remove empty group
+											if (group.second->empty()) { continue; }
+
+											// flush head
+											do_flush_group_head(out, group.first);
+											out << GAL_INI_DEBUG_FLUSH_NEW_LINE;
+
+											// kvs
+											for (const auto& kv: *group.second)
 											{
-												for (const auto& group: group_view)
-												{
-													// remove empty group
-													if (group.second->empty())
-													{
-														continue;
-													}
+												do_flush_kv(out, kv.first, kv.second);
+												out << GAL_INI_DEBUG_FLUSH_NEW_LINE;
+											}
+										}
 
-													// flush head
-													do_flush_group_head(out, group.first);
-													out << GAL_INI_DEBUG_FLUSH_NEW_LINE;
-
-													// kvs
-													for (const auto& kv: *group.second)
-													{
-														do_flush_kv(out, kv.first, kv.second);
-														out << GAL_INI_DEBUG_FLUSH_NEW_LINE;
-													}
-												}
-
-												// clear
-												group_view.clear();
-											}}});
+										// clear
+										group_view.clear();
+									}}});
 		}
 
-#if defined(GAL_INI_COMPILER_APPLE_CLANG) || defined(GAL_INI_COMPILER_CLANG_CL) || defined(GAL_INI_COMPILER_CLANG)
+		#if defined(GAL_INI_COMPILER_APPLE_CLANG) || defined(GAL_INI_COMPILER_CLANG_CL) || defined(GAL_INI_COMPILER_CLANG)
 		auto  workaround_extract_result_data = extract_from_file<context_type>(TEST_INI_FLUSHER_FILE_PATH);
-		auto& extract_result				 = workaround_extract_result_data.first;
-		auto& extract_data					 = workaround_extract_result_data.second;
-#else
+		auto& extract_result                 = workaround_extract_result_data.first;
+		auto& extract_data                   = workaround_extract_result_data.second;
+		#else
 		auto [extract_result, extract_data] = extract_from_file<context_type>(TEST_INI_FLUSHER_FILE_PATH);
-#endif
+		#endif
 
-		"extract_ok"_test = [extract_result]
-		{
-			expect((extract_result == ExtractResult::SUCCESS) >> fatal);
-		};
+		"extract_ok"_test = [extract_result] { expect((extract_result == ExtractResult::SUCCESS) >> fatal); };
 
-		"group_size"_test = [&]
-		{ expect((extract_data.size() == 2_i) >> fatal); };
+		"group_size"_test = [&] { expect((extract_data.size() == 2_i) >> fatal); };
 
 		"group_name"_test = [&]
 		{
@@ -403,7 +368,7 @@ namespace
 
 	GAL_INI_NO_DESTROY [[maybe_unused]] suite test_ini_flusher_flush_to_user = []
 	{
-		using key_type	= context_type::key_type;
+		using key_type = context_type::key_type;
 		using char_type = typename string_view_t<key_type>::value_type;
 
 		key_type buffer{};
@@ -418,15 +383,26 @@ namespace
 				out_type& out_;
 
 			public:
-				explicit MyOut(out_type& out) : out_{out} {}
+				explicit MyOut(out_type& out)
+					: out_{out} {}
 
-				/* constexpr */ auto operator<<(const char_type d) -> UserOut& override
+				/* constexpr */
+				auto operator<<(const char_type d) -> UserOut&
+					// Tell me why! MSVC!
+					#if not defined(GAL_INI_COMPILER_MSVC)
+				override
+				#endif
 				{
 					out_.push_back(d);
 					return *this;
 				}
 
-				/* constexpr */ auto operator<<(const std::basic_string_view<char_type> d) -> UserOut& override
+				/* constexpr */
+				auto operator<<(const string_view_t<char_type> d) -> UserOut&
+					// Tell me why! MSVC!
+					#if not defined(GAL_INI_COMPILER_MSVC)
+				override
+				#endif
 				{
 					out_.append(d);
 					return *this;
@@ -437,13 +413,13 @@ namespace
 
 			flush_to_user(TEST_INI_FLUSHER_FILE_PATH, data, out);
 
-#if defined(GAL_INI_COMPILER_APPLE_CLANG) || defined(GAL_INI_COMPILER_CLANG_CL) || defined(GAL_INI_COMPILER_CLANG)
+			#if defined(GAL_INI_COMPILER_APPLE_CLANG) || defined(GAL_INI_COMPILER_CLANG_CL) || defined(GAL_INI_COMPILER_CLANG)
 			auto  workaround_extract_result_data = extract_from_buffer<context_type>(buffer);
-			auto& extract_result				 = workaround_extract_result_data.first;
-			auto& extract_data					 = workaround_extract_result_data.second;
-#else
+			auto& extract_result                 = workaround_extract_result_data.first;
+			auto& extract_data                   = workaround_extract_result_data.second;
+			#else
 			auto [extract_result, extract_data] = extract_from_buffer<context_type>(buffer);
-#endif
+			#endif
 
 			check_initial_data(extract_result, extract_data);
 		}
