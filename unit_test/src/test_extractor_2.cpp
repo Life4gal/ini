@@ -163,7 +163,7 @@ namespace
 		std::string buffer{};
 
 		file.seekg(0, std::ios::end);
-		buffer.reserve(file.tellg());
+		buffer.reserve(static_cast<std::string::size_type>(file.tellg()));
 		file.seekg(0, std::ios::beg);
 
 		buffer.assign(
