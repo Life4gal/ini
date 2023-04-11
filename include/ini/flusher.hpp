@@ -21,84 +21,136 @@ namespace gal::ini
 	// 1. std::basic_ostream
 	template<typename Char>
 	using ostream_type = std::basic_ostream<Char>;
+
 	// 2. Inherit this class
 	template<typename Char>
 	class UserOut
 	{
 	public:
-		using char_type																		  = Char;
+		using char_type = Char;
 
-		constexpr UserOut() noexcept														  = default;
-		constexpr UserOut(const UserOut&) noexcept											  = default;
-		constexpr UserOut(UserOut&&) noexcept												  = default;
-		constexpr auto operator=(const UserOut&) noexcept -> UserOut&						  = default;
-		constexpr auto operator=(UserOut&&) noexcept -> UserOut&							  = default;
-		constexpr virtual ~UserOut() noexcept												  = default;
+		constexpr         UserOut() noexcept                             = default;
+		constexpr         UserOut(const UserOut&) noexcept               = default;
+		constexpr         UserOut(UserOut&&) noexcept                    = default;
+		constexpr auto    operator=(const UserOut&) noexcept -> UserOut& = default;
+		constexpr auto    operator=(UserOut&&) noexcept -> UserOut&      = default;
+		constexpr virtual ~UserOut() noexcept                            = default;
 
-		constexpr virtual auto operator<<(char_type data) -> UserOut&						  = 0;
-		constexpr virtual auto operator<<(std::basic_string_view<char_type> data) -> UserOut& = 0;
+		constexpr virtual auto operator<<(char_type data) -> UserOut&
+			// warning : instantiation of function 'gal::ini::UserOut<char>::operator<<' required here, but no definition is available [-Wundefined-func-template]
+			// note: add an explicit instantiation declaration to suppress this warning if 'gal::ini::UserOut<char>::operator<<' is explicitly instantiated in another translation unit
+			#if defined(GAL_INI_COMPILER_APPLE_CLANG) || defined(GAL_INI_COMPILER_CLANG_CL) || defined(GAL_INI_COMPILER_CLANG)
+		{
+			(void)data;
+			return *this;
+		}
+		#else
+			= 0;
+		#endif
+
+		constexpr virtual auto operator<<(string_view_t<char_type> data) -> UserOut&
+			// warning : instantiation of function 'gal::ini::UserOut<char>::operator<<' required here, but no definition is available [-Wundefined-func-template]
+			// note: add an explicit instantiation declaration to suppress this warning if 'gal::ini::UserOut<char>::operator<<' is explicitly instantiated in another translation unit
+			#if defined(GAL_INI_COMPILER_APPLE_CLANG) || defined(GAL_INI_COMPILER_CLANG_CL) || defined(GAL_INI_COMPILER_CLANG)
+		{
+			(void)data;
+			return *this;
+		}
+		#else
+				= 0;
+		#endif
 	};
 
 	// Determines if a key exists in the current group.
 	// note: This function is used to determine whether the comment and inline_comment of the key-value pair should be written to the file (for deleted key-value pairs, we discard the comment).
 	template<typename Char>
 	using kv_contains_type =
-			StackFunction<
-					auto
-					// pass key
-					(std::basic_string_view<Char> key)
-							// return key exists
-							->bool>;
+	StackFunction<
+		#if not defined(GAL_INI_COMPILER_MSVC)
+		auto
+		// pass key
+		(string_view_t<Char> key)
+		// return key exists
+			-> bool
+			#else
+		bool
+		(string_view_t<Char> key)
+			#endif
+	>;
 
 	// We read a key from the file, and the user writes the key-value pair indicated by the target key to out (or not, the choice is up to the user).
 	// note: We pass an output stream (usually an output file) to the user, and it is the user's responsibility to write all remaining key-value pairs "correctly" (although it is possible to add content, such as comments, while still ensuring correct formatting). We have to do this because we cannot assume the user's key-value pair type.
 	// note: DO NOT write newlines unless you want the inline_comment (if it exists) to be written to the next line.
 	template<typename Char>
 	using kv_flush_ostream_type =
-			StackFunction<
-					auto
-					// pass ostream and key
-					(ostream_type<Char>& out, std::basic_string_view<Char> key)
-							// return nothing
-							->void>;
+	StackFunction<
+		#if not defined(GAL_INI_COMPILER_MSVC)
+		auto
+		// pass ostream and key
+		(ostream_type<Char>& out,
+		string_view_t<Char>  key)
+		// return nothing
+			-> void
+			#else
+		void
+		(ostream_type<Char>& out, string_view_t<Char> key)
+			#endif
+	>;
 
 	template<typename Char>
 	using kv_flush_user_type =
-			StackFunction<
-					auto
-					// pass key
-					(std::basic_string_view<Char> key)
-							// return nothing
-							->void>;
+	StackFunction<
+		#if not defined(GAL_INI_COMPILER_MSVC)
+		auto
+		// pass key
+		(string_view_t<Char> key)
+		// return nothing
+			-> void
+			#else
+		void
+		(string_view_t<Char> key)
+			#endif
+	>;
 
 	// When we are done parsing a group, we need to add the remaining (newly added) key-value pairs to the back of the group as well.
 	// note: This requires that the key-value pairs of a group not be separated, or that the same group not be declared twice (or more), otherwise we don't know when we need to flush.
 	// note: We pass an output stream (usually an output file) to the user, and it is the user's responsibility to write all remaining key-value pairs "correctly" (although it is possible to add content, such as comments, while still ensuring correct formatting). We have to do this because we cannot assume the user's key-value pair type.
 	template<typename Char>
 	using kv_flush_remaining_ostream_type =
-			StackFunction<
-					auto
-					// pass ostream
-					(ostream_type<Char>& out)
-							// return nothing
-							->void>;
+	StackFunction<
+		#if not defined(GAL_INI_COMPILER_MSVC)
+		auto
+		// pass ostream
+		(ostream_type<Char>& out)
+		// return nothing
+			-> void
+			#else
+		void
+		(ostream_type<Char>& out)
+			#endif
+	>;
 
 	template<typename Char>
 	using kv_flush_remaining_user_type =
-			StackFunction<
-					auto()
-							// return nothing
-							->void>;
+	StackFunction<
+		#if not defined(GAL_INI_COMPILER_MSVC)
+		auto()
+		// return nothing
+			-> void
+			#else
+		void
+		()
+			#endif
+	>;
 
 	template<typename Char>
 	struct kv_ostream_handle
 	{
 		// group name
-		std::basic_string_view<Char> name{};
+		string_view_t<Char> name{};
 		// kv contains handle
-		kv_contains_type<Char>		 contains{
-				  [](const auto&) -> bool
-				  { return false; }};
+		kv_contains_type<Char> contains{
+				[](const auto&) -> bool { return false; }};
 
 		// kv flush handle
 		kv_flush_ostream_type<Char> flush{
@@ -113,11 +165,10 @@ namespace gal::ini
 	struct kv_user_handle
 	{
 		// group name
-		std::basic_string_view<Char> name{};
+		string_view_t<Char> name{};
 		// kv contains handle
-		kv_contains_type<Char>		 contains{
-				  [](const auto&) -> bool
-				  { return false; }};
+		kv_contains_type<Char> contains{
+				[](const auto&) -> bool { return false; }};
 
 		// kv flush handle
 		kv_flush_user_type<Char> flush{
@@ -134,12 +185,18 @@ namespace gal::ini
 	// note: You can have this function return true, so that we keep the group (even though it doesn't contain any key-value pairs), and keep its comment.
 	template<typename Char>
 	using group_contains_type =
-			StackFunction<
-					auto
-					// pass group name
-					(std::basic_string_view<Char> group_name)
-							// return group exists
-							->bool>;
+	StackFunction<
+		#if not defined(GAL_INI_COMPILER_MSVC)
+		auto
+		// pass group name
+		(string_view_t<Char> group_name)
+		// return group exists
+			-> bool
+			#else
+		bool
+		(string_view_t<Char> group_name)
+			#endif
+	>;
 
 	// We read a group name from the file, and the user writes the group head indicated by the target group name to out (or not, the choice is up to the user).
 	// note: We pass an output stream (usually an output file) to the user, and it is the user's responsibility to write group head "correctly" (although it is possible to add content, such as comments, while still ensuring correct formatting).
@@ -147,47 +204,72 @@ namespace gal::ini
 	// note: DO NOT write newlines unless you want the inline_comment (if it exists) to be written to the next line.
 	template<typename Char>
 	using group_flush_ostream_type =
-			StackFunction<
-					auto
-					// pass ostream and group name
-					(ostream_type<Char>& out, std::basic_string_view<Char> group_name)
-							// return kv_handler
-							->kv_ostream_handle<Char>>;
+	StackFunction<
+		#if not defined(GAL_INI_COMPILER_MSVC)
+		auto
+		// pass ostream and group name
+		(ostream_type<Char>& out,
+		string_view_t<Char>  group_name)
+		// return kv_handler
+			-> kv_ostream_handle<Char>
+			#else
+		kv_ostream_handle<Char>
+		(ostream_type<Char>& out, string_view_t<Char> group_name)
+			#endif
+	>;
 
 	template<typename Char>
 	using group_flush_user_type =
-			StackFunction<
-					auto
-					// pass group name
-					(std::basic_string_view<Char> group_name)
-							// return kv_handler
-							->kv_user_handle<Char>>;
+	StackFunction<
+		#if not defined(GAL_INI_COMPILER_MSVC)
+		auto
+		// pass group name
+		(string_view_t<Char> group_name)
+		// return kv_handler
+			-> kv_user_handle<Char>
+			#else
+		kv_user_handle<Char>
+		(string_view_t<Char> group_name)
+			#endif
+	>;
 
 	// After we have parsed all the groups in the file, we need to add the remaining (newly added) groups to the back of the file as well.
 	// note: We pass an output stream (usually an output file) to the user, and it is the user's responsibility to write all remaining groups and key-value pairs "correctly" (although it is possible to add content, such as comments, while still ensuring correct formatting). We have to do this because we cannot assume the user's group and key-value pair type.
 	template<typename Char>
 	using group_flush_remaining_ostream_type =
-			StackFunction<
-					auto
-					// pass ostream
-					(ostream_type<Char>& out)
-							// return nothing
-							->void>;
+	StackFunction<
+		#if not defined(GAL_INI_COMPILER_MSVC)
+		auto
+		// pass ostream
+		(ostream_type<Char>& out)
+		// return nothing
+			-> void
+			#else
+		void
+		(ostream_type<Char>& out)
+			#endif
+	>;
 
 	template<typename Char>
 	using group_flush_remaining_user_type =
-			StackFunction<
-					auto()
-							// return nothing
-							->void>;
+	StackFunction<
+		#if not defined(GAL_INI_COMPILER_MSVC)
+		auto
+		()
+		// return nothing
+			-> void
+			#else
+		void
+		()
+			#endif
+	>;
 
 	template<typename Char>
 	struct group_ostream_handle
 	{
 		// group contains handle
 		group_contains_type<Char> contains{
-				[](const auto&) -> bool
-				{ return false; }};
+				[](const auto&) -> bool { return false; }};
 
 		// group flush handle
 		group_flush_ostream_type<Char> flush{
@@ -203,12 +285,17 @@ namespace gal::ini
 	{
 		// get user out
 		// note: no default definition given
-		StackFunction<auto()->UserOut<Char>&> user{};
+		StackFunction<
+			#if not defined(GAL_INI_COMPILER_MSVC)
+			auto() -> UserOut<Char>&
+				#else
+			UserOut<Char>&()
+				#endif
+		> user{};
 
 		// group contains handle
-		group_contains_type<Char>			  contains{
-				[](const auto&) -> bool
-				{ return false; }};
+		group_contains_type<Char> contains{
+				[](const auto&) -> bool { return false; }};
 
 		// group flush handle
 		group_flush_user_type<Char> flush{
@@ -227,54 +314,37 @@ namespace gal::ini
 		// but in order to minimize dependencies and allow the user to maximize customization of the type, this design seems to be the only option.
 		// ==============================================
 
+		// ====================================================
+		// For flush to files, we only support std::basic_ifstream<char>.
+		// ====================================================
+
 		// char
 		[[nodiscard]] auto flush_to_file(
-				std::string_view		   file_path,
+				std::string_view           file_path,
 				group_ostream_handle<char> group_handler) -> FlushResult;
 
-		// wchar_t
-		// [[nodiscard]] auto flush_to_file(
-		// 		std::string_view		   file_path,
-		// 		group_ostream_handler<wchar_t> group_handler) -> FlushResult;
-
-		// char8_t
-		[[nodiscard]] auto flush_to_file(
-				std::string_view			  file_path,
-				group_ostream_handle<char8_t> group_handler) -> FlushResult;
-
-		// char16_t
-		[[nodiscard]] auto flush_to_file(
-				std::string_view			   file_path,
-				group_ostream_handle<char16_t> group_handler) -> FlushResult;
-
-		// char32_t
-		[[nodiscard]] auto flush_to_file(
-				std::string_view			   file_path,
-				group_ostream_handle<char32_t> group_handler) -> FlushResult;
+		// ====================================================
+		// For flush to UserOut, we support four character types and assume the encoding of the file based on the character type.
+		// ====================================================
 
 		// char
 		[[nodiscard]] auto flush_to_user(
-				std::string_view		file_path,
+				std::string_view        file_path,
 				group_user_handle<char> group_handler) -> FlushResult;
-
-		// wchar_t
-		// [[nodiscard]] auto flush_to_user(
-		// 		std::string_view		   file_path,
-		// 		group_user_handler<wchar_t> group_handler) -> FlushResult;
 
 		// char8_t
 		[[nodiscard]] auto flush_to_user(
-				std::string_view		   file_path,
+				std::string_view           file_path,
 				group_user_handle<char8_t> group_handler) -> FlushResult;
 
 		// char16_t
 		[[nodiscard]] auto flush_to_user(
-				std::string_view			file_path,
+				std::string_view            file_path,
 				group_user_handle<char16_t> group_handler) -> FlushResult;
 
 		// char32_t
 		[[nodiscard]] auto flush_to_user(
-				std::string_view			file_path,
+				std::string_view            file_path,
 				group_user_handle<char32_t> group_handler) -> FlushResult;
 	}// namespace flusher_detail
 
@@ -287,7 +357,7 @@ namespace gal::ini
 	 */
 	template<typename ContextType>
 	auto flush_to_file(
-			std::string_view																		 file_path,
+			const std::string_view                                                                   file_path,
 			group_ostream_handle<typename string_view_t<typename ContextType::key_type>::value_type> group_handler) -> FlushResult
 	{
 		return flusher_detail::flush_to_file(
@@ -297,7 +367,7 @@ namespace gal::ini
 
 	template<typename ContextType>
 	auto flush_to_user(
-			std::string_view																	  file_path,
+			const std::string_view                                                                file_path,
 			group_user_handle<typename string_view_t<typename ContextType::key_type>::value_type> group_handler) -> FlushResult
 	{
 		return flusher_detail::flush_to_user(
@@ -313,22 +383,22 @@ namespace gal::ini
 	 * @return Extract result.
 	 */
 	template<typename ContextType>
-	auto flush_to_file(std::string_view file_path, ContextType& in) -> FlushResult
+	auto flush_to_file(const std::string_view file_path, ContextType& in) -> FlushResult
 	{
-		using context_type						  = ContextType;
+		using context_type = ContextType;
 
-		using key_type							  = typename context_type::key_type;
-		using group_type						  = typename context_type::mapped_type;
+		using key_type = typename context_type::key_type;
+		using group_type = typename context_type::mapped_type;
 
-		using group_key_type					  = typename group_type::key_type;
-		using group_mapped_type					  = typename group_type::mapped_type;
+		using group_key_type = typename group_type::key_type;
+		using group_mapped_type = typename group_type::mapped_type;
 
-		using char_type							  = typename string_view_t<key_type>::value_type;
+		using char_type = typename string_view_t<key_type>::value_type;
 
-		using group_view_type					  = common::map_type_t<context_type, string_view_t<key_type>, const group_type*>;
-		using kv_view_type						  = common::map_type_t<group_type, string_view_t<group_key_type>, string_view_t<group_mapped_type>>;
+		using group_view_type = common::map_type_t<context_type, string_view_t<key_type>, const group_type*>;
+		using kv_view_type = common::map_type_t<group_type, string_view_t<group_key_type>, string_view_t<group_mapped_type>>;
 
-		constexpr static auto do_flush_group_head = [](ostream_type<char_type>& out, const std::basic_string_view<char_type> group_name) -> void
+		constexpr static auto do_flush_group_head = [](ostream_type<char_type>& out, const string_view_t<char_type> group_name) -> void
 		{
 			// '[' group_name ']'
 			// no '\n', see `group_flush_type`
@@ -337,7 +407,7 @@ namespace gal::ini
 					<< group_name
 					<< square_bracket<key_type>.second;
 		};
-		constexpr static auto do_flush_kv = [](ostream_type<char_type>& out, const std::basic_string_view<char_type> key, const std::basic_string_view<char_type> value) -> void
+		constexpr static auto do_flush_kv = [](ostream_type<char_type>& out, const string_view_t<char_type> key, const string_view_t<char_type> value) -> void
 		{
 			// key 'space' '=' 'space' value
 			// no '\n', see `kv_flush_type`
@@ -352,10 +422,7 @@ namespace gal::ini
 		auto group_view = [](const auto& gs) -> group_view_type
 		{
 			group_view_type vs{};
-			for (const auto& g: gs)
-			{
-				vs.emplace(g.first, &g.second);
-			}
+			for (const auto& g: gs) { vs.emplace(g.first, &g.second); }
 			return vs;
 		}(in);
 
@@ -367,14 +434,11 @@ namespace gal::ini
 		// This requires that the lambda "must" exist at this point (i.e. have a longer lifecycle than the StackFunction), which is fine for a single-level lambda (maybe?).
 		// However, if there is nesting, then the lambda will end its lifecycle early and the StackFunction will refer to an illegal address.
 		// Walking on the edge of UB!
-		auto		 kv_contains =
-				[&kv_view](const string_view_t<group_key_type> key) -> bool
-		{
-			return kv_view.contains(key);
-		};
+		auto                                                   kv_contains =
+				[&kv_view](const string_view_t<group_key_type> key) -> bool { return kv_view.contains(key); };
 
-		auto kv_flush =
-				[&kv_view](ostream_type<char_type>& out, const std::basic_string_view<char_type> key) -> void
+		auto                                        kv_flush =
+				[&kv_view](ostream_type<char_type>& out, const string_view_t<char_type> key) -> void
 		{
 			if (const auto kv_it = kv_view.find(key);
 				kv_it != kv_view.end())
@@ -387,14 +451,14 @@ namespace gal::ini
 			// else, do nothing
 		};
 
-		auto kv_flush_remaining =
+		auto                                        kv_flush_remaining =
 				[&kv_view](ostream_type<char_type>& out) -> void
 		{
 			for (const auto& kv: kv_view)
 			{
 				do_flush_kv(out, kv.first, kv.second);
 				// note: newlines
-				out << line_separator<std::basic_string_view<char_type>>;
+				out << line_separator<string_view_t<char_type>>;
 			}
 			// clear
 			kv_view.clear();
@@ -404,79 +468,73 @@ namespace gal::ini
 				file_path,
 				group_ostream_handle<char_type>{
 						.contains =
-								group_contains_type<char_type>{
-										[&group_view](string_view_t<key_type> group_name) -> bool
-										{
-											return group_view.contains(group_name);
-										}},
+						group_contains_type<char_type>{
+								[&group_view](string_view_t<key_type> group_name) -> bool { return group_view.contains(group_name); }},
 						.flush =
-								group_flush_ostream_type<char_type>{
-										[&group_view, &kv_view, &kv_contains, &kv_flush, &kv_flush_remaining](ostream_type<char_type>& out, const std::basic_string_view<char_type> group_name) -> kv_ostream_handle<char_type>
-										{
-											if (const auto group_it = group_view.find(group_name);
-												group_it != group_view.end())
-											{
-												// flush head
-												do_flush_group_head(out, group_name);
+						group_flush_ostream_type<char_type>{
+								[&group_view, &kv_view, &kv_contains, &kv_flush, &kv_flush_remaining](ostream_type<char_type>& out, const string_view_t<char_type> group_name) -> kv_ostream_handle<char_type>
+								{
+									if (const auto group_it = group_view.find(group_name);
+										group_it != group_view.end())
+									{
+										// flush head
+										do_flush_group_head(out, group_name);
 
-												// set current kvs view
-												for (const auto& kv: *group_it->second)
-												{
-													kv_view.emplace(kv.first, kv.second);
-												}
+										// set current kvs view
+										for (const auto& kv: *group_it->second) { kv_view.emplace(kv.first, kv.second); }
 
-												// remove this group from view
-												group_view.erase(group_name);
+										// remove this group from view
+										group_view.erase(group_name);
 
-												return {
-														.name			 = group_name,
-														.contains		 = kv_contains,
-														.flush			 = kv_flush,
-														.flush_remaining = kv_flush_remaining};
-											}
+										return {
+												.name = group_name,
+												.contains = kv_contains,
+												.flush = kv_flush,
+												.flush_remaining = kv_flush_remaining};
+									}
 
-											return {};
-										}},
+									return {};
+								}},
 						.flush_remaining =
-								group_flush_remaining_ostream_type<char_type>{
-										[&group_view](ostream_type<char_type>& out) -> void
+						group_flush_remaining_ostream_type<char_type>{
+								[&group_view](ostream_type<char_type>& out) -> void
+								{
+									for (const auto& group: group_view)
+									{
+										// flush head
+										do_flush_group_head(out, group.first);
+										out << line_separator<key_type>;
+
+										// kvs
+										for (const auto& kv: *group.second)
 										{
-											for (const auto& group: group_view)
-											{
-												// flush head
-												do_flush_group_head(out, group.first);
-												out << line_separator<key_type>;
+											do_flush_kv(out, kv.first, kv.second);
+											out << line_separator<group_key_type>;
+										}
+									}
 
-												// kvs
-												for (const auto& kv: *group.second)
-												{
-													do_flush_kv(out, kv.first, kv.second);
-													out << line_separator<group_key_type>;
-												}
-											}
-
-											// clear
-											group_view.clear();
-										}}});
+									// clear
+									group_view.clear();
+								}}});
 	}
 
 	template<typename ContextType>
-	auto flush_to_user(std::string_view file_path, ContextType& in, UserOut<typename string_view_t<typename ContextType::key_type>::value_type>& user) -> FlushResult
+	auto flush_to_user(const std::string_view file_path, ContextType& in, UserOut<typename string_view_t<typename ContextType::key_type>::value_type>& user) -> FlushResult
 	{
-		using context_type						  = ContextType;
+		using context_type = ContextType;
 
-		using key_type							  = typename context_type::key_type;
-		using group_type						  = typename context_type::mapped_type;
+		using key_type = typename context_type::key_type;
+		using group_type = typename context_type::mapped_type;
 
-		using group_key_type					  = typename group_type::key_type;
-		using group_mapped_type					  = typename group_type::mapped_type;
+		using group_key_type = typename group_type::key_type;
+		using group_mapped_type = typename group_type::mapped_type;
 
-		using char_type							  = typename string_view_t<key_type>::value_type;
+		using char_type = typename string_view_t<key_type>::value_type;
 
-		using group_view_type					  = common::map_type_t<context_type, string_view_t<key_type>, const group_type*>;
-		using kv_view_type						  = common::map_type_t<group_type, string_view_t<group_key_type>, string_view_t<group_mapped_type>>;
+		using group_view_type = common::map_type_t<context_type, string_view_t<key_type>, const group_type*>;
+		using kv_view_type = common::map_type_t<group_type, string_view_t<group_key_type>, string_view_t<group_mapped_type>>;
 
-		constexpr static auto do_flush_group_head = [](UserOut<char_type>& out, const std::basic_string_view<char_type> group_name) -> void
+		constexpr static auto do_flush_group_head = [](UserOut<char_type>& out, const string_view_t<char_type> group_name) -> void
 		{
 			// '[' group_name ']'
 			// no '\n', see `group_flush_type`
@@ -485,7 +543,7 @@ namespace gal::ini
 					<< group_name
 					<< square_bracket<key_type>.second;
 		};
-		constexpr static auto do_flush_kv = [](UserOut<char_type>& out, const std::basic_string_view<char_type> key, const std::basic_string_view<char_type> value) -> void
+		constexpr static auto do_flush_kv = [](UserOut<char_type>& out, const string_view_t<char_type> key, const string_view_t<char_type> value) -> void
 		{
 			// key 'space' '=' 'space' value
 			// no '\n', see `kv_flush_type`
@@ -500,10 +558,7 @@ namespace gal::ini
 		auto group_view = [](const auto& gs) -> group_view_type
 		{
 			group_view_type vs{};
-			for (const auto& g: gs)
-			{
-				vs.emplace(g.first, &g.second);
-			}
+			for (const auto& g: gs) { vs.emplace(g.first, &g.second); }
 			return vs;
 		}(in);
 
@@ -515,14 +570,11 @@ namespace gal::ini
 		// This requires that the lambda "must" exist at this point (i.e. have a longer lifecycle than the StackFunction), which is fine for a single-level lambda (maybe?).
 		// However, if there is nesting, then the lambda will end its lifecycle early and the StackFunction will refer to an illegal address.
 		// Walking on the edge of UB!
-		auto		 kv_contains =
-				[&kv_view](const string_view_t<group_key_type> key) -> bool
-		{
-			return kv_view.contains(key);
-		};
+		auto                                                   kv_contains =
+				[&kv_view](const string_view_t<group_key_type> key) -> bool { return kv_view.contains(key); };
 
-		auto kv_flush =
-				[&user, &kv_view](const std::basic_string_view<char_type> key) -> void
+		auto                                                     kv_flush =
+				[&user, &kv_view](const string_view_t<char_type> key) -> void
 		{
 			if (const auto kv_it = kv_view.find(key);
 				kv_it != kv_view.end())
@@ -542,7 +594,7 @@ namespace gal::ini
 			{
 				do_flush_kv(user, kv.first, kv.second);
 				// note: newlines
-				user << line_separator<std::basic_string_view<char_type>>;
+				user << line_separator<string_view_t<char_type>>;
 			}
 			// clear
 			kv_view.clear();
@@ -551,62 +603,55 @@ namespace gal::ini
 		return flush_to_user<ContextType>(
 				file_path,
 				group_user_handle<char_type>{
-						.user = [&user]() -> decltype(auto)
-						{ return user; },
+						.user = [&user]() -> decltype(auto) { return user; },
 						.contains =
-								group_contains_type<char_type>{
-										[&group_view](string_view_t<key_type> group_name) -> bool
-										{
-											return group_view.contains(group_name);
-										}},
+						group_contains_type<char_type>{
+								[&group_view](string_view_t<key_type> group_name) -> bool { return group_view.contains(group_name); }},
 						.flush =
-								group_flush_user_type<char_type>{
-										[&user, &group_view, &kv_view, &kv_contains, &kv_flush, &kv_flush_remaining](const std::basic_string_view<char_type> group_name) -> kv_user_handle<char_type>
-										{
-											if (const auto group_it = group_view.find(group_name);
-												group_it != group_view.end())
-											{
-												// flush head
-												do_flush_group_head(user, group_name);
+						group_flush_user_type<char_type>{
+								[&user, &group_view, &kv_view, &kv_contains, &kv_flush, &kv_flush_remaining](const string_view_t<char_type> group_name) -> kv_user_handle<char_type>
+								{
+									if (const auto group_it = group_view.find(group_name);
+										group_it != group_view.end())
+									{
+										// flush head
+										do_flush_group_head(user, group_name);
 
-												// set current kvs view
-												for (const auto& kv: *group_it->second)
-												{
-													kv_view.emplace(kv.first, kv.second);
-												}
+										// set current kvs view
+										for (const auto& kv: *group_it->second) { kv_view.emplace(kv.first, kv.second); }
 
-												// remove this group from view
-												group_view.erase(group_name);
+										// remove this group from view
+										group_view.erase(group_name);
 
-												return {
-														.name			 = group_name,
-														.contains		 = kv_contains,
-														.flush			 = kv_flush,
-														.flush_remaining = kv_flush_remaining};
-											}
+										return {
+												.name = group_name,
+												.contains = kv_contains,
+												.flush = kv_flush,
+												.flush_remaining = kv_flush_remaining};
+									}
 
-											return {};
-										}},
+									return {};
+								}},
 						.flush_remaining =
-								group_flush_remaining_user_type<char_type>{
-										[&user, &group_view]() -> void
+						group_flush_remaining_user_type<char_type>{
+								[&user, &group_view]() -> void
+								{
+									for (const auto& group: group_view)
+									{
+										// flush head
+										do_flush_group_head(user, group.first);
+										user << line_separator<key_type>;
+
+										// kvs
+										for (const auto& kv: *group.second)
 										{
-											for (const auto& group: group_view)
-											{
-												// flush head
-												do_flush_group_head(user, group.first);
-												user << line_separator<key_type>;
+											do_flush_kv(user, kv.first, kv.second);
+											user << line_separator<group_key_type>;
+										}
+									}
 
-												// kvs
-												for (const auto& kv: *group.second)
-												{
-													do_flush_kv(user, kv.first, kv.second);
-													user << line_separator<group_key_type>;
-												}
-											}
-
-											// clear
-											group_view.clear();
-										}}});
+									// clear
+									group_view.clear();
+								}}});
 	}
 }// namespace gal::ini
