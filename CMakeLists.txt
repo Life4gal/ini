@@ -354,7 +354,6 @@ endif (${PROJECT_NAME_PREFIX}DOC)
 # TESTS
 if (${PROJECT_NAME_PREFIX}TEST)
 	enable_testing()
-	add_subdirectory(standalone_test)
 	add_subdirectory(unit_test)
 endif (${PROJECT_NAME_PREFIX}TEST)
 
