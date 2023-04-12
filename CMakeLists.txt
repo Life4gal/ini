@@ -9,7 +9,7 @@ set(
 
 set(
 		${PROJECT_NAME_PREFIX}MINOR_VERSION
-		4
+		5
 )
 
 set(
