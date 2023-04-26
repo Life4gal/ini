@@ -731,7 +731,13 @@ namespace
 		{
 			out_.close();
 
-			std::filesystem::copy_file(
+			if (!exists(source_path_.parent_path()))
+			{
+				// create directory if not exist
+				create_directories(source_path_.parent_path());
+			}
+
+			copy_file(
 					temp_path_,
 					source_path_,
 					std::filesystem::copy_options::overwrite_existing);
