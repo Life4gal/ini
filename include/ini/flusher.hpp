@@ -319,7 +319,7 @@ namespace gal::ini
 		// ====================================================
 
 		// char
-		GAL_INI_SYMBOL_EXPORT [[nodiscard]] auto flush_to_file(
+		[[nodiscard]] GAL_INI_SYMBOL_EXPORT auto flush_to_file(
 				std::string_view           file_path,
 				group_ostream_handle<char> group_handler) -> FlushResult;
 
@@ -328,22 +328,22 @@ namespace gal::ini
 		// ====================================================
 
 		// char
-		GAL_INI_SYMBOL_EXPORT [[nodiscard]] auto flush_to_user(
+		[[nodiscard]] GAL_INI_SYMBOL_EXPORT auto flush_to_user(
 				std::string_view        file_path,
 				group_user_handle<char> group_handler) -> FlushResult;
 
 		// char8_t
-		GAL_INI_SYMBOL_EXPORT [[nodiscard]] auto flush_to_user(
+		[[nodiscard]] GAL_INI_SYMBOL_EXPORT auto flush_to_user(
 				std::string_view           file_path,
 				group_user_handle<char8_t> group_handler) -> FlushResult;
 
 		// char16_t
-		GAL_INI_SYMBOL_EXPORT [[nodiscard]] auto flush_to_user(
+		[[nodiscard]] GAL_INI_SYMBOL_EXPORT auto flush_to_user(
 				std::string_view            file_path,
 				group_user_handle<char16_t> group_handler) -> FlushResult;
 
 		// char32_t
-		GAL_INI_SYMBOL_EXPORT [[nodiscard]] auto flush_to_user(
+		[[nodiscard]] GAL_INI_SYMBOL_EXPORT auto flush_to_user(
 				std::string_view            file_path,
 				group_user_handle<char32_t> group_handler) -> FlushResult;
 	}// namespace flusher_detail

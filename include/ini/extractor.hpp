@@ -71,22 +71,22 @@ namespace gal::ini
 		// ====================================================
 
 		// char
-		GAL_INI_SYMBOL_EXPORT [[nodiscard]] auto extract_from_file(
+		[[nodiscard]] GAL_INI_SYMBOL_EXPORT auto extract_from_file(
 				std::string_view        file_path,
 				group_append_type<char> group_appender) -> ExtractResult;
 
 		// char8_t
-		GAL_INI_SYMBOL_EXPORT [[nodiscard]] auto extract_from_file(
+		[[nodiscard]] GAL_INI_SYMBOL_EXPORT auto extract_from_file(
 				std::string_view           file_path,
 				group_append_type<char8_t> group_appender) -> ExtractResult;
 
 		// char16_t
-		GAL_INI_SYMBOL_EXPORT [[nodiscard]] auto extract_from_file(
+		[[nodiscard]] GAL_INI_SYMBOL_EXPORT auto extract_from_file(
 				std::string_view            file_path,
 				group_append_type<char16_t> group_appender) -> ExtractResult;
 
 		// char32_t
-		GAL_INI_SYMBOL_EXPORT [[nodiscard]] auto extract_from_file(
+		[[nodiscard]] GAL_INI_SYMBOL_EXPORT auto extract_from_file(
 				std::string_view            file_path,
 				group_append_type<char32_t> group_appender) -> ExtractResult;
 
@@ -95,22 +95,22 @@ namespace gal::ini
 		// ====================================================
 
 		// char
-		GAL_INI_SYMBOL_EXPORT [[nodiscard]] auto extract_from_buffer(
+		[[nodiscard]] GAL_INI_SYMBOL_EXPORT auto extract_from_buffer(
 				string_view_t<char>     buffer,
 				group_append_type<char> group_appender) -> ExtractResult;
 
 		// char8_t
-		GAL_INI_SYMBOL_EXPORT [[nodiscard]] auto extract_from_buffer(
+		[[nodiscard]] GAL_INI_SYMBOL_EXPORT auto extract_from_buffer(
 				string_view_t<char8_t>     buffer,
 				group_append_type<char8_t> group_appender) -> ExtractResult;
 
 		// char16_t
-		GAL_INI_SYMBOL_EXPORT [[nodiscard]] auto extract_from_buffer(
+		[[nodiscard]] GAL_INI_SYMBOL_EXPORT auto extract_from_buffer(
 				string_view_t<char16_t>     buffer,
 				group_append_type<char16_t> group_appender) -> ExtractResult;
 
 		// char32_t
-		GAL_INI_SYMBOL_EXPORT [[nodiscard]] auto extract_from_buffer(
+		[[nodiscard]] GAL_INI_SYMBOL_EXPORT auto extract_from_buffer(
 				string_view_t<char32_t>     buffer,
 				group_append_type<char32_t> group_appender) -> ExtractResult;
 	}// namespace extractor_detail
