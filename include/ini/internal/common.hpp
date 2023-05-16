@@ -23,6 +23,12 @@
 #define GAL_INI_CONSTEVAL consteval
 #endif
 
+#if defined(GAL_INI_PLATFORM_WINDOWS)
+	#define GAL_INI_SYMBOL_EXPORT __declspec(dllexport)
+#else
+	#define GAL_INI_SYMBOL_EXPORT// __attribute__((visibility("default")))
+#endif
+
 namespace gal::ini
 {
 	namespace common
