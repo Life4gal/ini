@@ -260,6 +260,7 @@ namespace
 			{
 				// begin with not '\r', '\n', '\r\n', whitespace or '='
 				constexpr auto begin_with_not_blank = dsl::unicode::print - dsl::unicode::newline - dsl::unicode::blank - dsl::equal_sign;
+
 				// continue with printable, but excluding '\r', '\n', '\r\n', whitespace and '='
 				constexpr auto continue_with_printable = dsl::unicode::print - dsl::unicode::newline - dsl::unicode::blank - dsl::equal_sign;
 
@@ -731,7 +732,9 @@ namespace
 		{
 			out_.close();
 
-			if (!exists(source_path_.parent_path()))
+			std::error_code error_code = {};
+
+			if (!exists(source_path_.parent_path(), error_code))
 			{
 				// create directory if not exist
 				create_directories(source_path_.parent_path());
@@ -740,10 +743,16 @@ namespace
 			copy_file(
 					temp_path_,
 					source_path_,
-					std::filesystem::copy_options::overwrite_existing);
+					std::filesystem::copy_options::overwrite_existing,
+					error_code);
 		}
 
-		[[nodiscard]] auto ready() const noexcept -> bool { return exists(temp_path_) && out_.is_open() && out_.good(); }
+		[[nodiscard]] auto ready() const noexcept -> bool
+		{
+			std::error_code error_code = {};
+
+			return exists(temp_path_, error_code) && out_.is_open() && out_.good();
+		}
 
 		template<typename Data>
 		auto operator<<(const Data& data) -> FlushFile&
@@ -992,7 +1001,8 @@ namespace gal::ini
 					std::string_view                             file_path,
 					group_append_type<typename State::char_type> group_appender) -> ExtractResult
 			{
-				if (!std::filesystem::exists(file_path)) { return ExtractResult::FILE_NOT_FOUND; }
+				if (std::error_code error_code = {};
+					!std::filesystem::exists(file_path, error_code)) { return ExtractResult::FILE_NOT_FOUND; }
 
 				if (auto file = lexy::read_file<typename State::encoding>(file_path.data());
 					!file)
@@ -1145,7 +1155,8 @@ namespace gal::ini
 					std::string_view                  file_path,
 					typename State::group_handle_type group_handler) -> FlushResult
 			{
-				if (!std::filesystem::exists(file_path))
+				if (std::error_code error_code = {};
+					!std::filesystem::exists(file_path, error_code))
 				{
 					// The file doesn't exist, it doesn't matter, just write the file.
 					// return FlushResult::FILE_NOT_FOUND;
