@@ -1,4 +1,4 @@
-= CMakeTemplateProject
+= INI
 Life4gal <Life4gal@gmail.com>
 :toc:
 :icons: font
