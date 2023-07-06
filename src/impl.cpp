@@ -349,7 +349,8 @@ namespace
 			{
 				// Everything is allowed inside a string except for control characters.
 				// fixme: error: use of variable template 'error' requires template arguments
-				#if defined(GAL_INI_COMPILER_APPLE_CLANG)
+				// #if defined(GAL_INI_COMPILER_APPLE_CLANG)
+				#if defined(GAL_INI_PLATFORM_MACOS)
 				#define WORKAROUND_APPLE_CLANG_TEMPLATE template
 				#else
 				#define WORKAROUND_APPLE_CLANG_TEMPLATE
