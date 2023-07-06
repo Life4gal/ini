@@ -284,19 +284,21 @@ namespace
 
 			[[nodiscard]] CONSTEVAL static auto name() noexcept -> const char* { return "[value]"; }
 
+			// If a string does not start with double quotes, no special characters and no whitespace are allowed
 			constexpr static auto rule = []
 			{
-				// begin with not '\r', '\n', '\r\n', whitespace or '='
+				// begin with not '\r', '\n', '\r\n' or whitespace
 				constexpr auto begin_with_not_blank =
 						dsl::unicode::print - dsl::unicode::newline - dsl::unicode::blank - dsl::equal_sign
 						// todo: we need a better way to support the possible addition of comment formats in the future.
-						// see also: variable_or_comment::rule -> dsl::peek(...)
+						// see also: variable_pair_or_comment::rule -> dsl::peek(...)
 						- dsl::lit_c<comment_hash_sign<State>::indication> - dsl::lit_c<comment_semicolon<State>::indication>;
 
 				// continue with printable, but excluding '\r', '\n', '\r\n', whitespace and '='
-				constexpr auto continue_with_printable = dsl::unicode::print - dsl::unicode::newline - dsl::unicode::blank - dsl::equal_sign;
+				constexpr auto continue_with_printable = dsl::unicode::print - dsl::unicode::newline - dsl::unicode::blank;
 
-				return dsl::peek(begin_with_not_blank) >>
+				return
+						dsl::peek(begin_with_not_blank) >>
 						(LEXY_DEBUG("parse variable value begin") +
 						dsl::identifier(begin_with_not_blank, continue_with_printable) +
 						LEXY_DEBUG("parse variable value end"));
@@ -305,9 +307,100 @@ namespace
 			constexpr static auto value = lexy::forward<lexeme_type>;
 		};
 
+		template<typename State>
+		struct variable_value_quoted : lexy::transparent_production
+		{
+			using state_type = State;
+
+			using lexeme_type = typename state_type::lexeme_type;
+
+			[[nodiscard]] CONSTEVAL static auto name() noexcept -> const char* { return "[quoted value]"; }
+
+			struct invalid_char
+			{
+				constexpr static auto name = "invalid character in string literal";
+			};
+
+			// ======================
+			// fixme: note that since we do not (and cannot) allocate memory ourselves, we do not handle any escaped symbols and code_points
+			// "hello\nworld\u0021" --> 18 characters: 'h' 'e' 'l' 'l' 'o' '\' 'n' 'w' 'o' 'r' 'l' 'd' '\' 'u' '0' '0' '2' '1'
+
+			// // A mapping of the simple escape sequences to their replacement values.
+			// // fixme: char type?
+			// // fixme: expected `template` keyword before dependent template name [-Werror=missing-template-keyword]
+			// #if defined(GAL_INI_COMPILER_GNU)
+			// #define WORKAROUND_GCC_TEMPLATE template
+			// #else
+			// #define WORKAROUND_GCC_TEMPLATE
+			// #endif
+			// constexpr static auto escaped_symbols = lexy::symbol_table<char>//
+			// 										.WORKAROUND_GCC_TEMPLATE map<'"'>('"')
+			// 										.WORKAROUND_GCC_TEMPLATE map<'\\'>('\\')
+			// 										.WORKAROUND_GCC_TEMPLATE map<'/'>('/')
+			// 										.WORKAROUND_GCC_TEMPLATE map<'b'>('\b')
+			// 										.WORKAROUND_GCC_TEMPLATE map<'f'>('\f')
+			// 										.WORKAROUND_GCC_TEMPLATE map<'n'>('\n')
+			// 										.WORKAROUND_GCC_TEMPLATE map<'r'>('\r')
+			// 										.WORKAROUND_GCC_TEMPLATE map<'t'>('\t');
+			// #undef WORKAROUND_GCC_TEMPLATE
+
+			// If a string starts with double quotes, whitespace is allowed in its content
+			constexpr static auto rule = []
+			{
+				// Everything is allowed inside a string except for control characters.
+				constexpr auto code_point_within_quoted = (-dsl::unicode::control).error<invalid_char>;
+
+				// Escape sequences start with a backlash and either map one of the symbols, or a Unicode code point.
+				// constexpr auto escape_within_quoted = dsl::backslash_escape.symbol<escaped_symbols>().rule(dsl::lit_c<'u'> >> dsl::code_point_id<4>);
+
+				return
+						dsl::peek(dsl::quoted.open()) >>
+						(LEXY_DEBUG("parse variable value begin") +
+						// dsl::quoted.limit(dsl::ascii::newline)(code_point_within_quoted, escape_within_quoted) +
+						dsl::quoted.limit(dsl::ascii::newline)(code_point_within_quoted) +
+						LEXY_DEBUG("parse variable value end"));
+			}();
+
+			struct forwarder
+			{
+				struct sinker
+				{
+					using return_type = lexeme_type;
+
+					return_type lexeme;
+
+					constexpr auto operator()(return_type l) noexcept -> void { lexeme = l; }
+
+					// constexpr auto operator()([[maybe_unused]] const lexy::code_point cp) const noexcept -> void
+					// {
+					// 	// fixme!
+					// 	(void)this;
+					// 	GAL_INI_UNREACHABLE();
+					// }
+					//
+					// constexpr auto operator()([[maybe_unused]] const typename return_type::char_type c) const noexcept -> void
+					// {
+					// 	// fixme!
+					// 	(void)this;
+					// 	GAL_INI_UNREACHABLE();
+					// }
+
+					constexpr auto finish() noexcept -> return_type { return lexeme; }
+				};
+
+				[[nodiscard]] constexpr auto sink() const noexcept -> sinker
+				{
+					(void)this;
+					return {};
+				}
+			};
+
+			constexpr static auto value = forwarder{};
+		};
+
 		// identifier = [variable]
 		template<typename State>
-		struct variable_declaration : lexy::transparent_production
+		struct variable_pair_declaration : lexy::transparent_production
 		{
 			using state_type = State;
 
@@ -318,14 +411,15 @@ namespace
 			[[nodiscard]] CONSTEVAL static auto name() noexcept -> const char* { return "[variable pair declaration]"; }
 
 			constexpr static auto rule =
-					LEXY_DEBUG("parse variable_declaration begin") +
+					LEXY_DEBUG("parse variable_pair_declaration begin") +
 					dsl::position +
 					dsl::p<variable_key<State>> +
 					dsl::equal_sign +
-					dsl::opt(dsl::p<variable_value<State>>) +
+					// Note that "variable_value_quoted" have higher priority
+					dsl::opt(dsl::p<variable_value_quoted<State>> | dsl::p<variable_value<State>>) +
 					dsl::opt(comment_inline_production<State>) +
-					LEXY_DEBUG("parse variable_declaration end")
-			// note: variable_declaration `does not consume` the newline
+					LEXY_DEBUG("parse variable_pair_declaration end")
+			// note: variable_pair_declaration `does not consume` the newline
 			;
 
 			constexpr static auto value = callback<void>(
@@ -401,9 +495,9 @@ namespace
 		};
 
 		template<typename State>
-		struct variable_or_comment
+		struct variable_pair_or_comment
 		{
-			[[nodiscard]] CONSTEVAL static auto name() noexcept -> const char* { return "[variable or comment]"; }
+			[[nodiscard]] CONSTEVAL static auto name() noexcept -> const char* { return "[variable pair or comment]"; }
 
 			constexpr static auto rule =
 					(dsl::peek(dsl::newline | dsl::unicode::blank) >> dsl::p<blank_line<State>>) |
@@ -417,7 +511,7 @@ namespace
 					dsl::newline)) |
 					// variable
 					(dsl::else_ >>
-					(dsl::p<variable_declaration<State>> +
+					(dsl::p<variable_pair_declaration<State>> +
 					// newline
 					dsl::newline));
 
@@ -508,11 +602,11 @@ namespace
 							dsl::peek(dsl::square_bracketed.open()))
 					.opt_list(
 							dsl::try_(
-									dsl::p<variable_or_comment<State>>,
+									dsl::p<variable_pair_or_comment<State>>,
 									// ignore this line if an error raised
 									LEXY_DEBUG("ignore invalid line...") + dsl::until(dsl::newline))) +
 					// strictly speaking, this is not 'just' the end of the previous group,
-					// but also the possibility that 'variable_or_comment' has already parsed the next group's comments.
+					// but also the possibility that 'variable_pair_or_comment' has already parsed the next group's comments.
 					LEXY_DEBUG("parse group properties end")));
 
 			constexpr static auto value = lexy::forward<void>;
