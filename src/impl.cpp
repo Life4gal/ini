@@ -348,7 +348,13 @@ namespace
 			constexpr static auto rule = []
 			{
 				// Everything is allowed inside a string except for control characters.
-				constexpr auto code_point_within_quoted = (-dsl::unicode::control).error<invalid_char>;
+				// fixme: error: use of variable template 'error' requires template arguments
+				#if defined(GAL_INI_COMPILER_APPLE_CLANG)
+				#define WORKAROUND_APPLE_CLANG_TEMPLATE template
+				#else
+				#define WORKAROUND_APPLE_CLANG_TEMPLATE
+				#endif
+				constexpr auto code_point_within_quoted = (-dsl::unicode::control).WORKAROUND_APPLE_CLANG_TEMPLATE error<invalid_char>;
 
 				// Escape sequences start with a backlash and either map one of the symbols, or a Unicode code point.
 				// constexpr auto escape_within_quoted = dsl::backslash_escape.symbol<escaped_symbols>().rule(dsl::lit_c<'u'> >> dsl::code_point_id<4>);
@@ -411,14 +417,23 @@ namespace
 			[[nodiscard]] CONSTEVAL static auto name() noexcept -> const char* { return "[variable pair declaration]"; }
 
 			constexpr static auto rule =
-					LEXY_DEBUG("parse variable_pair_declaration begin") +
+					#if defined(GAL_INI_COMPILER_CLANG_CL) // error : static assertion failed due to requirement '37ULL <= 32ULL': string out of range
+					LEXY_DEBUG("parse vpd begin")
+					#else
+					LEXY_DEBUG("parse variable_pair_declaration begin")
+					#endif
+					+
 					dsl::position +
 					dsl::p<variable_key<State>> +
 					dsl::equal_sign +
 					// Note that "variable_value_quoted" have higher priority
 					dsl::opt(dsl::p<variable_value_quoted<State>> | dsl::p<variable_value<State>>) +
 					dsl::opt(comment_inline_production<State>) +
+					#if defined(GAL_INI_COMPILER_CLANG_CL) // error : static assertion failed due to requirement '35ULL <= 32ULL': string out of range
+					LEXY_DEBUG("parse vpd end")
+					#else
 					LEXY_DEBUG("parse variable_pair_declaration end")
+					#endif
 			// note: variable_pair_declaration `does not consume` the newline
 			;
 
