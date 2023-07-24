@@ -34,8 +34,7 @@ namespace
 			else if constexpr (requires { std::hash<String>{}; }) { return std::hash<String>{}(string); }
 			else
 			{
-				[]<bool AlwaysFalse = false> { static_assert(AlwaysFalse, "Unsupported hash type!"); }
-						();
+				[]<bool AlwaysFalse = false>() { static_assert(AlwaysFalse, "Unsupported hash type!"); }();
 			}
 		}
 	};

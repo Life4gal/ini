@@ -23,7 +23,7 @@ namespace
 			expect(arg >= 1_i);
 		} | std::vector{1, 2, 3};
 
-		"types"_test = []<typename T>
+		"types"_test = []<typename T>()
 		{
 			expect(std::is_integral_v<T>) << "all types are integrals";
 		} | std::tuple<bool, int>{};

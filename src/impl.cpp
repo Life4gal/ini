@@ -871,7 +871,7 @@ namespace
 			else
 			{
 				// todo: support char32/16/8_t characters?
-				[]<bool AlwaysFalse = false> { static_assert(AlwaysFalse, "FIXME"); }();
+				[]<bool AlwaysFalse = false>() { static_assert(AlwaysFalse, "FIXME"); }();
 			}
 
 			return *this;
