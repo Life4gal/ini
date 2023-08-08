@@ -3,12 +3,12 @@ project(
 		LANGUAGES CXX
 )
 
-file(
-		GLOB_RECURSE
-		${PROJECT_NAME}_SOURCE
-		CONFIGURE_DEPENDS
+set(
+	${PROJECT_NAME}_SOURCE
 
-		src/*.cpp
+	src/main.cpp
+
+	src/test_extractor_std_string.cpp
 )
 
 add_executable(
@@ -22,8 +22,8 @@ target_compile_definitions(
 	PUBLIC
 
 	BOOST_UT_DISABLE_MODULE
-	TEST_INI_EXTRACTOR_FILE_PATH="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test_ini_extractor.ini"
-	TEST_INI_FLUSHER_FILE_PATH="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test_ini_flusher.ini"
+	TEST_INI_EXTRACTOR_FILE_PATH="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test_extractor.ini"
+	TEST_INI_FLUSHER_FILE_PATH="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test_flusher.ini"
 )
 
 include(${${PROJECT_NAME_PREFIX}3RD_PARTY_PATH}/ut/ut.cmake)

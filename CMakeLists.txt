@@ -190,13 +190,18 @@ endif (${PROJECT_NAME_PREFIX}SYSTEM_HEADERS)
 # HEADER FILES
 set(
 		${PROJECT_NAME_PREFIX}HEADER
+
+		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/impl/function_ref.hpp
+		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/impl/common.hpp
+
+		${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/extractor.hpp
 )
 
 # SOURCE FILES
 set(
 		${PROJECT_NAME_PREFIX}SOURCE
 
-		${PROJECT_SOURCE_DIR}/src/dummy.cpp
+		${PROJECT_SOURCE_DIR}/src/impl.cpp
 )
 
 # LIBRARY

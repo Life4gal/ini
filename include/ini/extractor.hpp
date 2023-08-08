@@ -1,6 +1,11 @@
+// Copyright (C) 2022-2023 Life4gal <life4gal@gmail.com>
+// This file is subject to the license terms in the LICENSE file
+// found in the top-level directory of this distribution.
+
 #pragma once
 
-#include <ini/internal/common.hpp>
+#include <ini/impl/function_ref.hpp>
+#include <ini/impl/common.hpp>
 
 namespace gal::ini
 {
@@ -16,267 +21,290 @@ namespace gal::ini
 		SUCCESS,
 	};
 
-	template<typename Char>
-	using kv_append_type =
-	StackFunction<
-		#if not defined(GAL_INI_COMPILER_MSVC)
-		auto
-		// pass new key, new value
-		(string_view_t<Char>,
-		string_view_t<Char>)
-		// return inserted(or exists) key, value and insert result
-			-> std::pair<std::pair<string_view_t<Char>, string_view_t<Char>>, bool>
-			#else
-		std::pair<std::pair<string_view_t<Char>, string_view_t<Char>>, bool>
-		(string_view_t<Char>, string_view_t<Char>)
-			#endif
-	>;
-
-	template<typename Char>
-	struct group_append_result
+	template<typename String>
+	struct appender_traits
 	{
-		// inserted(or exists) group_name
-		string_view_t<Char> name;
-		// kv insert handle
-		kv_append_type<Char> kv_appender;
-		// insert result
-		bool inserted;
+		using string_type = String;
+		using char_type = typename string_type::value_type;
+
+		constexpr static auto allocatable = requires(string_type& string) { string.push_back(std::declval<char_type>()); };
+
+		using view_type = std::conditional_t<allocatable, std::basic_string_view<char_type>, String>;
+		using argument_type = std::conditional_t<allocatable, std::add_rvalue_reference_t<string_type>, string_type>;
+
+		struct kv_append_result
+		{
+			// The key in the container
+			view_type key;
+			// The value in the container
+			view_type value;
+			// Newly inserted property?
+			bool inserted;
+		};
+
+		using kv_appender = FunctionRef<kv_append_result(argument_type key_to_be_inserted, argument_type value_to_be_inserted)>;
+
+		struct section_append_result
+		{
+			// The name of the current section
+			view_type name;
+			// kv appender
+			kv_appender appender;
+			// Newly inserted section?
+			bool inserted;
+		};
+
+		using section_appender = FunctionRef<section_append_result(argument_type section_to_be_inserted)>;
 	};
 
-	template<typename Char>
-	using group_append_type =
-	StackFunction<
-		#if not defined(GAL_INI_COMPILER_MSVC)
-		auto
-		// pass new group name
-		(string_view_t<Char> group_name)
-		// group_append_result
-			-> group_append_result<Char>
-			#else
-		group_append_result<Char>
-		(string_view_t<Char> group_name)
-			#endif
-	>;
+	// ①
+	// appender
 
-	namespace extractor_detail
-	{
-		// ==============================================
-		// This is a very bad design, we have to iterate through all possible character types,
-		// even StackFunction is on the edge of UB,
-		// but in order to minimize dependencies and allow the user to maximize customization of the type, this design seems to be the only option.
-		// ==============================================
+	GAL_INI_SYMBOL_EXPORT auto extract_from_file(
+			string_view_type                                    filename,
+			appender_traits<string_view_type>::section_appender appender
+			) -> ExtractResult;
 
-		// ====================================================
-		// For extract from files, we support four character types and assume the encoding of the file based on the character type.
-		// ====================================================
+	GAL_INI_SYMBOL_EXPORT auto extract_from_file(
+			string_view_type                               filename,
+			appender_traits<string_type>::section_appender appender
+			) -> ExtractResult;
 
-		// char
-		[[nodiscard]] GAL_INI_SYMBOL_EXPORT auto extract_from_file(
-				std::string_view        file_path,
-				group_append_type<char> group_appender) -> ExtractResult;
+	GAL_INI_SYMBOL_EXPORT auto extract_from_buffer(
+			string_view_type                                    buffer,
+			appender_traits<string_view_type>::section_appender appender) -> ExtractResult;
 
-		// char8_t
-		[[nodiscard]] GAL_INI_SYMBOL_EXPORT auto extract_from_file(
-				std::string_view           file_path,
-				group_append_type<char8_t> group_appender) -> ExtractResult;
+	GAL_INI_SYMBOL_EXPORT auto extract_from_buffer(
+			string_view_type                               buffer,
+			appender_traits<string_type>::section_appender appender) -> ExtractResult;
 
-		// char16_t
-		[[nodiscard]] GAL_INI_SYMBOL_EXPORT auto extract_from_file(
-				std::string_view            file_path,
-				group_append_type<char16_t> group_appender) -> ExtractResult;
+	// ②
+	// string_type + container
 
-		// char32_t
-		[[nodiscard]] GAL_INI_SYMBOL_EXPORT auto extract_from_file(
-				std::string_view            file_path,
-				group_append_type<char32_t> group_appender) -> ExtractResult;
-
-		// ====================================================
-		// For extract from buffer, we support four character types and assume the encoding of the file based on the character type.
-		// ====================================================
-
-		// char
-		[[nodiscard]] GAL_INI_SYMBOL_EXPORT auto extract_from_buffer(
-				string_view_t<char>     buffer,
-				group_append_type<char> group_appender) -> ExtractResult;
-
-		// char8_t
-		[[nodiscard]] GAL_INI_SYMBOL_EXPORT auto extract_from_buffer(
-				string_view_t<char8_t>     buffer,
-				group_append_type<char8_t> group_appender) -> ExtractResult;
-
-		// char16_t
-		[[nodiscard]] GAL_INI_SYMBOL_EXPORT auto extract_from_buffer(
-				string_view_t<char16_t>     buffer,
-				group_append_type<char16_t> group_appender) -> ExtractResult;
-
-		// char32_t
-		[[nodiscard]] GAL_INI_SYMBOL_EXPORT auto extract_from_buffer(
-				string_view_t<char32_t>     buffer,
-				group_append_type<char32_t> group_appender) -> ExtractResult;
-	}// namespace extractor_detail
-
-	/**
-	 * @brief Extract ini data from files.
-	 * @tparam ContextType Type of the output data.
-	 * @param file_path The (absolute) path to the file.
-	 * @param group_appender How to add a new group.
-	 * @return Extract result.
-	 */
-	template<typename ContextType>
-	auto extract_from_file(
-			const std::string_view                                                                file_path,
-			group_append_type<typename string_view_t<typename ContextType::key_type>::value_type> group_appender) -> ExtractResult
-	{
-		return extractor_detail::extract_from_file(
-				file_path,
-				group_appender);
-	}
-
-	/**
-	 * @brief Extract ini data from files.
-	 * @tparam ContextType Type of the output data.
-	 * @param file_path The (absolute) path to the file.
-	 * @param out Where the extracted data is stored.
-	 * @return Extract result.
-	 */
-	template<typename ContextType>
-	auto extract_from_file(const std::string_view file_path, ContextType& out) -> ExtractResult
-	{
-		using context_type = ContextType;
-
-		using key_type = typename context_type::key_type;
-		using group_type = typename context_type::mapped_type;
-
-		using group_key_type = typename group_type::key_type;
-		using group_mapped_type = typename group_type::mapped_type;
-
-		using char_type = typename string_view_t<key_type>::value_type;
-
-		// We need the following one temporary variable to hold some necessary information, and they must have a longer lifetime than the incoming StackFunction.
-		auto current_group_it = out.end();
-
-		// !!!MUST PLACE HERE!!!
-		// StackFunction keeps the address of the lambda and forwards the argument to the lambda when StackFunction::operator() has been called.
-		// This requires that the lambda "must" exist at this point (i.e. have a longer lifecycle than the StackFunction), which is fine for a single-level lambda (maybe?).
-		// However, if there is nesting, then the lambda will end its lifecycle early and the StackFunction will refer to an illegal address.
-		// Walking on the edge of UB!
-		auto kv_appender = [&current_group_it](const string_view_t<group_key_type> key, const string_view_t<group_mapped_type> value) -> std::pair<std::pair<string_view_t<group_key_type>, string_view_t<group_mapped_type>>, bool>
+	template<typename String, typename Container>
+		requires requires
 		{
-			const auto [kv_it, kv_inserted] = current_group_it->second.emplace(group_key_type{key}, group_mapped_type{value});
-			return {{kv_it->first, kv_it->second}, kv_inserted};
+			// iterator -> key + mapped
+			// #1
+			std::tuple_size_v<std::remove_cvref_t<decltype(std::declval<Container&>().end())>> == 2;
+
+			// section insertion
+
+			// iterator + bool
+			// #2
+			std::tuple_size_v<std::remove_cvref_t<decltype(std::declval<Container&>().emplace(std::declval<typename appender_traits<String>::argument_type>(), std::declval<typename Container::mapped_type>()))>> == 2;
+			// iterator -> key + value
+			// #3
+			std::tuple_size_v<std::tuple_element_t<0, std::remove_cvref_t<decltype(std::declval<Container&>().emplace(std::declval<typename appender_traits<String>::argument_type>(), std::declval<typename Container::mapped_type>()))>>> == 2;
+
+			// kv insertion
+
+			// iterator + bool
+			// #4
+			std::tuple_size_v<std::remove_cvref_t<decltype(std::declval<typename Container::mapped_type&>().emplace(std::declval<typename appender_traits<String>::argument_type>(), std::declval<typename appender_traits<String>::argument_type>()))>> == 2;
+			// iterator -> key + value
+			// #5
+			std::tuple_size_v<std::tuple_element_t<0, std::remove_cvref_t<decltype(std::declval<typename Container::mapped_type&>().emplace(std::declval<typename appender_traits<String>::argument_type>(), std::declval<typename appender_traits<String>::argument_type>()))>>> == 2;
+		}
+	GAL_INI_SYMBOL_EXPORT auto extract_from_file(
+			const string_view_type filename,
+			Container&             out) -> ExtractResult
+	{
+		using traits_type = appender_traits<String>;
+
+		// We need the following temporary variables to hold some necessary information, and they must have a longer lifetime than the incoming `FunctionRef`.
+
+		auto current_section_it = out.end();
+
+		auto kv_appender = [&current_section_it](typename traits_type::argument_type key_to_be_inserted, typename traits_type::argument_type value_to_be_inserted) -> typename traits_type::kv_append_result
+		{
+			// see #1
+			auto& [section_name, mapped] = *current_section_it;
+			// see #4
+			const auto [it, inserted] = mapped.emplace(std::forward<typename traits_type::argument_type>(key_to_be_inserted), std::forward<typename traits_type::argument_type>(value_to_be_inserted));
+			// see #5
+			const auto& [inserted_key, inserted_value] = *it;
+
+			return {
+					.key = inserted_key,
+					.value = inserted_value,
+					.inserted = inserted};
+		};
+		auto section_appender = [&out, &current_section_it, &kv_appender](typename traits_type::argument_type section_name) -> typename traits_type::section_append_result
+		{
+			// see #2
+			const auto [it, inserted] = out.emplace(std::forward<typename traits_type::argument_type>(section_name), typename Container::mapped_type{});
+			// see #3
+			const auto& [inserted_name, inserted_mapped] = *it;
+
+			current_section_it = it;
+			return {
+					.name = inserted_name,
+					.appender = kv_appender,
+					.inserted = inserted};
 		};
 
-		return extract_from_file<ContextType>(
-				file_path,
-				group_append_type<char_type>{
-						[&out, &current_group_it, &kv_appender](string_view_t<key_type> group_name) -> group_append_result<char_type>
-						{
-							#if defined(GAL_INI_COMPILER_APPLE_CLANG) || defined(GAL_INI_COMPILER_CLANG_CL) || defined(GAL_INI_COMPILER_CLANG)
-							const auto workaround_emplace_result = out.emplace(key_type{group_name}, group_type{});
-							const auto group_it                  = workaround_emplace_result.first;
-							const auto group_inserted            = workaround_emplace_result.second;
-							#else
-							const auto [group_it, group_inserted] = out.emplace(key_type{group_name}, group_type{});
-							#endif
-
-							current_group_it = group_it;
-
-							return {
-									.name = group_it->first,
-									.kv_appender = kv_appender,
-									.inserted = group_inserted};
-						}});
+		// call ①
+		return extract_from_file(filename, section_appender);
 	}
 
-	template<typename ContextType>
-	auto extract_from_file(const std::string_view file_path) -> std::pair<ExtractResult, ContextType>
+	template<typename String, typename Container>
+		requires requires
+		{
+			{
+				extract_from_file<String, Container>(std::declval<string_view_type>(), std::declval<Container&>())
+			} -> std::same_as<ExtractResult>;
+		}
+	GAL_INI_SYMBOL_EXPORT auto extract_from_file(
+			const string_view_type filename) -> std::pair<ExtractResult, Container>
 	{
-		ContextType out{};
-		const auto  result = extract_from_file<ContextType>(file_path, out);
+		Container out{};
+		auto      result = extract_from_file<String, Container>(filename, out);
 		return {result, out};
 	}
 
-	/**
-	 * @brief Extract ini data from buffer.
-	 * @tparam ContextType Type of the output data.
-	 * @param buffer The buffer.
-	 * @param group_appender How to add a new group.
-	 * @return Extract result.
-	 */
-	template<typename ContextType>
-	auto extract_from_buffer(
-			string_view_t<typename string_view_t<typename ContextType::key_type>::value_type>     buffer,
-			group_append_type<typename string_view_t<typename ContextType::key_type>::value_type> group_appender) -> ExtractResult
-	{
-		return extractor_detail::extract_from_buffer(
-				buffer,
-				group_appender);
-	}
-
-	/**
-	 * @brief Extract ini data from buffer.
-	 * @tparam ContextType Type of the output data.
-	 * @param buffer The buffer.
-	 * @param out Where the extracted data is stored.
-	 * @return Extract result.
-	 */
-	template<typename ContextType>
-	auto extract_from_buffer(
-			string_view_t<typename string_view_t<typename ContextType::key_type>::value_type> buffer,
-			ContextType&                                                                      out) -> ExtractResult
-	{
-		using context_type = ContextType;
-
-		using key_type = typename context_type::key_type;
-		using group_type = typename context_type::mapped_type;
-
-		using group_key_type = typename group_type::key_type;
-		using group_mapped_type = typename group_type::mapped_type;
-
-		using char_type = typename string_view_t<key_type>::value_type;
-
-		// We need the following one temporary variable to hold some necessary information, and they must have a longer lifetime than the incoming StackFunction.
-		typename context_type::iterator current_group_it = out.end();
-
-		// !!!MUST PLACE HERE!!!
-		// StackFunction keeps the address of the lambda and forwards the argument to the lambda when StackFunction::operator() has been called.
-		// This requires that the lambda "must" exist at this point (i.e. have a longer lifecycle than the StackFunction), which is fine for a single-level lambda (maybe?).
-		// However, if there is nesting, then the lambda will end its lifecycle early and the StackFunction will refer to an illegal address.
-		// Walking on the edge of UB!
-		auto kv_appender = [&current_group_it](const string_view_t<group_key_type> key, const string_view_t<group_mapped_type> value) -> std::pair<std::pair<string_view_t<group_key_type>, string_view_t<group_mapped_type>>, bool>
+	template<typename String, typename Container>
+		requires requires
 		{
-			const auto [kv_it, kv_inserted] = current_group_it->second.emplace(group_key_type{key}, group_mapped_type{value});
-			return {{kv_it->first, kv_it->second}, kv_inserted};
+			// iterator -> key + mapped
+			// #1
+			std::tuple_size_v<std::remove_cvref_t<decltype(std::declval<Container&>().end())>> == 2;
+
+			// section insertion
+
+			// iterator + bool
+			// #2
+			std::tuple_size_v<std::remove_cvref_t<decltype(std::declval<Container&>().emplace(std::declval<typename appender_traits<String>::argument_type>(), std::declval<typename Container::mapped_type>()))>> == 2;
+			// iterator -> key + value
+			// #3
+			std::tuple_size_v<std::tuple_element_t<0, std::remove_cvref_t<decltype(std::declval<Container&>().emplace(std::declval<typename appender_traits<String>::argument_type>(), std::declval<typename Container::mapped_type>()))>>> == 2;
+
+			// kv insertion
+
+			// iterator + bool
+			// #4
+			std::tuple_size_v<std::remove_cvref_t<decltype(std::declval<typename Container::mapped_type&>().emplace(std::declval<typename appender_traits<String>::argument_type>(), std::declval<typename appender_traits<String>::argument_type>()))>> == 2;
+			// iterator -> key + value
+			// #5
+			std::tuple_size_v<std::tuple_element_t<0, std::remove_cvref_t<decltype(std::declval<typename Container::mapped_type&>().emplace(std::declval<typename appender_traits<String>::argument_type>(), std::declval<typename appender_traits<String>::argument_type>()))>>> == 2;
+		}
+	GAL_INI_SYMBOL_EXPORT auto extract_from_buffer(
+			const string_view_type buffer,
+			Container&             out) -> ExtractResult
+	{
+		using traits_type = appender_traits<String>;
+
+		// We need the following temporary variables to hold some necessary information, and they must have a longer lifetime than the incoming `FunctionRef`.
+
+		auto current_section_it = out.end();
+
+		auto kv_appender = [&current_section_it](typename traits_type::argument_type key_to_be_inserted, typename traits_type::argument_type value_to_be_inserted) -> typename traits_type::kv_append_result
+		{
+			// see #1
+			auto& [section_name, mapped] = *current_section_it;
+			// see #4
+			const auto [it, inserted] = mapped.emplace(std::forward<typename traits_type::argument_type>(key_to_be_inserted), std::forward<typename traits_type::argument_type>(value_to_be_inserted));
+			// see #5
+			const auto& [inserted_key, inserted_value] = *it;
+
+			return {
+					.key = inserted_key,
+					.value = inserted_value,
+					.inserted = inserted};
+		};
+		auto section_appender = [&out, &current_section_it, &kv_appender](typename traits_type::argument_type section_name) -> typename traits_type::section_append_result
+		{
+			// see #2
+			const auto [it, inserted] = out.emplace(std::forward<typename traits_type::argument_type>(section_name), typename Container::mapped_type{});
+			// see #3
+			const auto& [inserted_name, inserted_mapped] = *it;
+
+			current_section_it = it;
+			return {
+					.name = inserted_name,
+					.appender = kv_appender,
+					.inserted = inserted};
 		};
 
-		return extract_from_buffer<ContextType>(
-				buffer,
-				group_append_type<char_type>{
-						[&out, &current_group_it, &kv_appender](string_view_t<key_type> group_name) -> group_append_result<char_type>
-						{
-							#if defined(GAL_INI_COMPILER_APPLE_CLANG) || defined(GAL_INI_COMPILER_CLANG_CL) || defined(GAL_INI_COMPILER_CLANG)
-							const auto workaround_emplace_result = out.emplace(key_type{group_name}, group_type{});
-							const auto group_it                  = workaround_emplace_result.first;
-							const auto group_inserted            = workaround_emplace_result.second;
-							#else
-							const auto [group_it, group_inserted] = out.emplace(key_type{group_name}, group_type{});
-							#endif
-
-							current_group_it = group_it;
-
-							return {
-									.name = group_it->first,
-									.kv_appender = kv_appender,
-									.inserted = group_inserted};
-						}});
+		// call ①
+		return extract_from_buffer(buffer, section_appender);
 	}
 
-	template<typename ContextType>
-	auto extract_from_buffer(
-			string_view_t<typename string_view_t<typename ContextType::key_type>::value_type> buffer) -> std::pair<ExtractResult, ContextType>
+	template<typename String, typename Container>
+		requires requires
+		{
+			{
+				extract_from_buffer<String, Container>(std::declval<string_view_type>(), std::declval<Container&>())
+			} -> std::same_as<ExtractResult>;
+		}
+	GAL_INI_SYMBOL_EXPORT auto extract_from_buffer(
+			const string_view_type buffer) -> std::pair<ExtractResult, Container>
 	{
-		ContextType out{};
-		const auto  result = extract_from_buffer<ContextType>(buffer, out);
+		Container out{};
+		auto      result = extract_from_buffer<String, Container>(buffer, out);
 		return {result, out};
 	}
-}// namespace gal::ini
+
+	// ③
+	// container
+
+	template<typename Container>
+		requires requires
+		{
+			{
+				extract_from_file<typename Container::key_type, Container>(std::declval<string_view_type>(), std::declval<Container&>())
+			} -> std::same_as<ExtractResult>;
+		}
+	GAL_INI_SYMBOL_EXPORT auto extract_from_file(
+			const string_view_type filename,
+			Container&             out) -> ExtractResult
+	{
+		// call ②
+		return extract_from_file<typename Container::key_type, Container>(filename, out);
+	}
+
+	template<typename Container>
+		requires requires
+		{
+			{
+				extract_from_file<typename Container::key_type, Container>(std::declval<string_view_type>(), std::declval<Container&>())
+			} -> std::same_as<ExtractResult>;
+		}
+	GAL_INI_SYMBOL_EXPORT auto extract_from_file(
+			const string_view_type filename) -> std::pair<ExtractResult, Container>
+	{
+		Container out{};
+		auto      result = extract_from_file<typename Container::key_type, Container>(filename, out);
+		return {result, out};
+	}
+
+	template<typename Container>
+		requires requires
+		{
+			{
+				extract_from_buffer<typename Container::key_type, Container>(std::declval<string_view_type>(), std::declval<Container&>())
+			} -> std::same_as<ExtractResult>;
+		}
+	GAL_INI_SYMBOL_EXPORT auto extract_from_buffer(
+			const string_view_type buffer,
+			Container&             out) -> ExtractResult
+	{
+		// call ②
+		return extract_from_buffer<typename Container::key_type, Container>(buffer, out);
+	}
+
+	template<typename Container>
+		requires requires
+		{
+			{
+				extract_from_buffer<typename Container::key_type, Container>(std::declval<string_view_type>(), std::declval<Container&>())
+			} -> std::same_as<ExtractResult>;
+		}
+	GAL_INI_SYMBOL_EXPORT auto extract_from_buffer(
+			const string_view_type buffer) -> std::pair<ExtractResult, Container>
+	{
+		Container out{};
+		auto      result = extract_from_buffer<typename Container::key_type, Container>(buffer, out);
+		return {result, out};
+	}
+}
