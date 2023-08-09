@@ -109,7 +109,7 @@ namespace gal::ini
 			{
 				// iterator -> key + mapped
 				// #1
-				std::tuple_size_v<std::remove_cvref_t<decltype(std::declval<Container&>().end())>> == 2;
+				std::tuple_size_v<std::remove_cvref_t<decltype(*std::declval<Container&>().end())>> == 2;
 
 				// section insertion
 
@@ -118,7 +118,7 @@ namespace gal::ini
 				std::tuple_size_v<std::remove_cvref_t<decltype(std::declval<Container&>().emplace(std::declval<typename Container::key_type>(), std::declval<typename Container::mapped_type>()))>> == 2;
 				// iterator -> key + value
 				// #3
-				std::tuple_size_v<std::tuple_element_t<0, std::remove_cvref_t<decltype(std::declval<Container&>().emplace(std::declval<typename Container::key_type>(), std::declval<typename Container::mapped_type>()))>>> == 2;
+				std::tuple_size_v<std::remove_cvref_t<decltype(*std::declval<std::tuple_element_t<0, std::remove_cvref_t<decltype(std::declval<Container&>().emplace(std::declval<typename Container::key_type>(), std::declval<typename Container::mapped_type>()))>>>())>> == 2;
 
 				// kv insertion
 
@@ -127,7 +127,7 @@ namespace gal::ini
 				std::tuple_size_v<std::remove_cvref_t<decltype(std::declval<typename Container::mapped_type&>().emplace(std::declval<typename Container::mapped_type::key_type>(), std::declval<typename Container::mapped_type::mapped_type>()))>> == 2;
 				// iterator -> key + value
 				// #5
-				std::tuple_size_v<std::tuple_element_t<0, std::remove_cvref_t<decltype(std::declval<typename Container::mapped_type&>().emplace(std::declval<typename Container::mapped_type::key_type>(), std::declval<typename Container::mapped_type::mapped_type>()))>>> == 2;
+				std::tuple_size_v<std::remove_cvref_t<decltype(*std::declval<std::tuple_element_t<0, std::remove_cvref_t<decltype(std::declval<typename Container::mapped_type&>().emplace(std::declval<typename Container::mapped_type::key_type>(), std::declval<typename Container::mapped_type::mapped_type>()))>>>())>> == 2;
 			}
 		auto call_extract(
 				const string_view_type filename_or_buffer,
