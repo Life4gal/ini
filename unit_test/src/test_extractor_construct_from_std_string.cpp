@@ -7,6 +7,7 @@
 
 using namespace boost::ut;
 using namespace gal::ini;
+using namespace std::string_view_literals;
 
 #if defined(GAL_INI_COMPILER_APPLE_CLANG) || defined(GAL_INI_COMPILER_CLANG_CL) || defined(GAL_INI_COMPILER_CLANG)
 	#define GAL_INI_NO_DESTROY [[clang::no_destroy]]
@@ -24,8 +25,57 @@ using namespace gal::ini;
 
 namespace
 {
-	using group_type = std::map<std::string, std::string, std::less<>>;
-	using context_type = std::map<std::string, group_type, std::less<>>;
+	class UserString
+	{
+	public:
+		using string_type = std::string;
+		using string_view_type = std::string_view;
+
+		using value_type = string_type::value_type;
+
+	private:
+		string_type string_;
+
+	public:
+		explicit(false) UserString(string_type&& string)
+			: string_{std::move(string)} {}
+
+		explicit(false) UserString(const char* string)
+			: string_{string} {}
+
+		// for appender_traits::allocatable
+		constexpr auto push_back(const value_type c) -> void { string_.push_back(c); }
+
+		[[nodiscard]] constexpr auto data() const noexcept -> const string_type& { return string_; }
+
+		friend constexpr auto operator<=>(const UserString& lhs, const UserString& rhs) noexcept -> auto { return lhs.data() <=> rhs.data(); }
+
+		friend constexpr auto operator<=>(const UserString& lhs, const string_type& rhs) noexcept -> auto { return lhs.data() <=> rhs; }
+
+		friend constexpr auto operator<=>(const string_type& lhs, const UserString& rhs) noexcept -> auto { return lhs <=> rhs.data(); }
+
+		friend constexpr auto operator<=>(const UserString& lhs, const string_view_type rhs) noexcept -> auto { return lhs.data() <=> rhs; }
+
+		friend constexpr auto operator<=>(const string_view_type lhs, const UserString& rhs) noexcept -> auto { return lhs <=> rhs.data(); }
+
+		friend constexpr auto operator<=>(const UserString& lhs, const string_type::pointer rhs) noexcept -> auto { return lhs.data() <=> rhs; }
+
+		friend constexpr auto operator<=>(const string_type::pointer lhs, const UserString& rhs) noexcept -> auto { return lhs <=> rhs.data(); }
+
+		template<std::size_t N>
+		friend constexpr auto operator<=>(const UserString& lhs, const string_type::value_type (&rhs)[N]) noexcept -> auto { return lhs.data() <=> rhs; }
+
+		template<std::size_t N>
+		friend constexpr auto operator<=>(const string_type::value_type (&lhs)[N], const UserString& rhs) noexcept -> auto { return lhs <=> rhs.data(); }
+
+		[[nodiscard]] constexpr explicit(false) operator string_view_type() const noexcept { return string_; }
+	};
+
+	// UserString::push_back
+	static_assert(appender_traits<UserString>::allocatable);
+
+	using group_type = std::map<UserString, UserString, std::less<>>;
+	using context_type = std::map<UserString, group_type, std::less<>>;
 
 	GAL_INI_NO_DESTROY [[maybe_unused]] suite suite_generate_file = []
 	{
@@ -95,24 +145,24 @@ namespace
 
 			expect((group.size() == 4_i) >> fatal);
 
-			expect(group.contains(GROUP2_KEY"1") >> fatal);
-			expect(group.contains(GROUP2_KEY"2") >> fatal);
-			expect(group.contains(GROUP2_KEY"3") >> fatal);
-			expect(group.contains(GROUP2_KEY"4") >> fatal);
+			expect(group.contains(GROUP2_KEY "1") >> fatal);
+			expect(group.contains(GROUP2_KEY "2") >> fatal);
+			expect(group.contains(GROUP2_KEY "3") >> fatal);
+			expect(group.contains(GROUP2_KEY "4") >> fatal);
 
-			expect((group.at(GROUP2_KEY"1") == GROUP2_VALUE"1") >> fatal);
-			expect((group.at(GROUP2_KEY"2") == GROUP2_VALUE"2") >> fatal);
-			expect((group.at(GROUP2_KEY"3") == GROUP2_VALUE"3") >> fatal);
-			expect((group.at(GROUP2_KEY"4") == GROUP2_VALUE"4") >> fatal);
+			expect((group.at(GROUP2_KEY "1") == GROUP2_VALUE "1") >> fatal);
+			expect((group.at(GROUP2_KEY "2") == GROUP2_VALUE "2") >> fatal);
+			expect((group.at(GROUP2_KEY "3") == GROUP2_VALUE "3") >> fatal);
+			expect((group.at(GROUP2_KEY "4") == GROUP2_VALUE "4") >> fatal);
 		};
 	};
 
 	GAL_INI_NO_DESTROY [[maybe_unused]] suite suite_extract_from_file = []
 	{
 		#if defined(GAL_INI_COMPILER_APPLE_CLANG) || defined(GAL_INI_COMPILER_CLANG_CL) || defined(GAL_INI_COMPILER_CLANG)
-			auto  workaround_extract_result_data = extract_from_file<context_type>(TEST_INI_EXTRACTOR_FILE_PATH);
-			auto& extract_result				 = workaround_extract_result_data.first;
-			auto& data							 = workaround_extract_result_data.second;
+		auto  workaround_extract_result_data = extract_from_file<context_type>(TEST_INI_EXTRACTOR_FILE_PATH);
+		auto& extract_result				 = workaround_extract_result_data.first;
+		auto& data							 = workaround_extract_result_data.second;
 		#else
 		auto [extract_result, data] = extract_from_file<context_type>(TEST_INI_EXTRACTOR_FILE_PATH);
 		#endif
@@ -136,13 +186,13 @@ namespace
 				std::istreambuf_iterator<char>());
 
 		#if defined(GAL_INI_COMPILER_APPLE_CLANG) || defined(GAL_INI_COMPILER_CLANG_CL) || defined(GAL_INI_COMPILER_CLANG)
-			auto  workaround_extract_result_data = extract_from_buffer<context_type>(buffer);
-			auto& extract_result				 = workaround_extract_result_data.first;
-			auto& data							 = workaround_extract_result_data.second;
+		auto  workaround_extract_result_data = extract_from_buffer<context_type>(buffer);
+		auto& extract_result				 = workaround_extract_result_data.first;
+		auto& data							 = workaround_extract_result_data.second;
 		#else
 		auto [extract_result, data] = extract_from_buffer<context_type>(buffer);
 		#endif
 
 		do_check_extract_result(extract_result, data);
 	};
-};
+}

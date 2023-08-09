@@ -9,6 +9,8 @@ set(
 	src/main.cpp
 
 	src/test_extractor_std_string.cpp
+	src/test_extractor_construct_from_std_string.cpp
+	src/test_extractor_construct_from_std_string_view.cpp
 )
 
 add_executable(
