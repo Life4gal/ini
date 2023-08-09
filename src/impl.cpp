@@ -99,7 +99,6 @@ namespace
 
 		struct string_literal
 		{
-
 			// A mapping of the simple escape sequences to their replacement values.
 			// fixme: expected `template` keyword before dependent template name [-Werror=missing-template-keyword]
 			#if defined(GAL_INI_COMPILER_GNU)
@@ -145,12 +144,6 @@ namespace
 								dsl::unicode::print - dsl::unicode::newline);
 
 				constexpr static auto value =
-						// callback<void>(
-						// 		[](auto& state, const global_lexeme_type lexeme) -> std::conditional_t<IsInline, global_lexeme_type, void>
-						// 		{
-						// 			if constexpr (IsInline) { return lexeme; }
-						// 			else { state.comment(lexeme); }
-						// 		});
 						[]
 						{
 							if constexpr (IsInline)
@@ -205,11 +198,11 @@ namespace
 		using comment_inline = comment<true>;
 
 		template<typename State>
-		struct property_key : lexy::transparent_production
+		struct property_name : lexy::transparent_production
 		{
-			struct invalid_key
+			struct invalid_name
 			{
-				constexpr static auto name = "a valid key was required here";
+				constexpr static auto name = "a valid property name was required here";
 			};
 
 			using string_type = typename State::argument_type;
@@ -226,27 +219,26 @@ namespace
 				if constexpr (allocatable)
 				{
 					return dsl::delimited(
-									// begin with not '\r', '\n', '\r\n', whitespace or '='
-									dsl::peek(dsl::unicode::print - dsl::unicode::newline - dsl::unicode::blank - dsl::equal_sign),
-									// end until '='
-									dsl::peek(dsl::equal_sign))(dsl::unicode::print, string_literal::escape) |
-							// This error can make the line parsing fail immediately when the [key] cannot be parsed, and then skip this line (instead of trying to make other possible matches).
-							dsl::error<invalid_key>;
+							// begin with not '\r', '\n', '\r\n', whitespace or '='
+							dsl::peek(dsl::unicode::print - dsl::unicode::newline - dsl::unicode::blank - dsl::equal_sign),
+							// end until '='
+							dsl::peek(dsl::equal_sign)
+							)(dsl::unicode::print.error<invalid_name>, string_literal::escape);
 				}
 				else
 				{
 					// begin with not '\r', '\n', '\r\n', whitespace or '='
 					constexpr auto begin = dsl::unicode::print - dsl::unicode::newline - dsl::unicode::blank - dsl::equal_sign;
 
-					// trailing with printable, but excluding '\r', '\n', '\r\n', whitespace and '='
-					constexpr auto trailing = dsl::unicode::print - dsl::unicode::newline - dsl::unicode::blank - dsl::equal_sign;
+					// trailing with printable, but excluding '='
+					constexpr auto trailing = dsl::unicode::print - dsl::equal_sign;
 
 					return dsl::peek(begin) >>
 							(LEXY_DEBUG("parse property key begin") +
 							dsl::identifier(begin, trailing) +
 							LEXY_DEBUG("parse property key end")) |
 							// This error can make the line parsing fail immediately when the [key] cannot be parsed, and then skip this line (instead of trying to make other possible matches).
-							dsl::error<invalid_key>;
+							dsl::error<invalid_name>;
 				}
 			}();
 
@@ -275,7 +267,7 @@ namespace
 				if constexpr (allocatable)
 				{
 					return dsl::delimited(
-							// begin with not '\r', '\n', '\r\n', whitespace, '=', ';' or '#'
+							// begin with not '\r', '\n', '\r\n', whitespace, ';' or '#'
 							dsl::peek(dsl::unicode::print - dsl::unicode::newline - dsl::unicode::blank - dsl::lit_c<';'> - dsl::lit_c<'#'>),
 							// comment_indication),
 							// end until '\r', '\n', '\r\n', ';' or '#'
@@ -283,11 +275,11 @@ namespace
 				}
 				else
 				{
-					// begin with not '\r', '\n', '\r\n', whitespace, '=', ';' or '#'
-					constexpr auto begin = dsl::unicode::print - dsl::unicode::newline - dsl::unicode::blank - dsl::equal_sign - dsl::lit_c<';'> - dsl::lit_c<'#'>;// comment_indication
+					// begin with not '\r', '\n', '\r\n', whitespace, ';' or '#'
+					constexpr auto begin = dsl::unicode::print - dsl::unicode::newline - dsl::unicode::blank - dsl::lit_c<';'> - dsl::lit_c<'#'>;// comment_indication
 
-					// trailing with printable, but excluding '\r', '\n', '\r\n', ';', '#' and whitespace
-					constexpr auto trailing = dsl::unicode::print - dsl::unicode::newline - dsl::unicode::blank - dsl::lit_c<';'> - dsl::lit_c<'#'>;// comment_indication
+					// trailing with printable, but excluding '\r', '\n', '\r\n', ';' and '#'
+					constexpr auto trailing = dsl::unicode::print - dsl::unicode::newline - dsl::lit_c<';'> - dsl::lit_c<'#'>;// comment_indication
 
 					return dsl::peek(begin) >>
 							(LEXY_DEBUG("parse property value begin") +
@@ -312,8 +304,9 @@ namespace
 
 			constexpr static auto trim_right_whitespace = [](auto& key) -> void
 			{
-				// see property_key<String>::rule
-				// Since whitespace is allowed to exist in the middle of a key name, we have to terminate with `=` / '\r' / '\n' / '\r\n'.
+				// see property_name<String>::rule and property_value<String>::rule
+				// Since whitespace is allowed to exist in the middle of a key string, we have to terminate with `=` / '\r' / '\n' / '\r\n'.
+				// Since whitespace is allowed to exist in the middle of a value string, we have to terminate with  '\r' / '\n' / '\r\n' / ';' / '#'.
 				// This means we have to manually remove the whitespace that follows on the right side.
 				const auto view =
 						key |
@@ -321,7 +314,19 @@ namespace
 						std::views::take_while([](const auto c) -> bool { return std::isspace(c); });
 				const auto                                   whitespace_count = std::ranges::distance(view);
 
-				if (whitespace_count != 0) { key.resize(key.size() - whitespace_count); }
+				if (whitespace_count != 0)
+				{
+					if constexpr (allocatable)
+					{
+						// string
+						key.resize(key.size() - whitespace_count);
+					}
+					else
+					{
+						// lexeme
+						key = string_type{key.begin(), key.size() - whitespace_count};
+					}
+				}
 			};
 
 			constexpr static auto name = "[property]";
@@ -329,7 +334,7 @@ namespace
 			constexpr static auto rule =
 					LEXY_DEBUG("parse property begin") +
 					dsl::position +
-					dsl::p<property_key<State>> +
+					dsl::p<property_name<State>> +
 					dsl::equal_sign +
 					dsl::opt(dsl::p<property_value<State>>) +
 					dsl::opt(dsl::p<comment_inline>) +
@@ -346,11 +351,8 @@ namespace
 						string_type                value,
 						const global_lexeme_type   comment_inline) -> void
 						{
-							if constexpr (allocatable)
-							{
-								trim_right_whitespace(key);
-								trim_right_whitespace(value);
-							}
+							trim_right_whitespace(key);
+							trim_right_whitespace(value);
 							state.property(position, std::forward<string_type>(key), std::forward<string_type>(value), comment_inline);
 						},
 						// key = value
@@ -361,11 +363,8 @@ namespace
 						string_type                value,
 						lexy::nullopt) -> void
 						{
-							if constexpr (allocatable)
-							{
-								trim_right_whitespace(key);
-								trim_right_whitespace(value);
-							}
+							trim_right_whitespace(key);
+							trim_right_whitespace(value);
 							state.property(position, std::forward<string_type>(key), std::forward<string_type>(value), {});
 						},
 						// key = comment_inline
@@ -376,7 +375,7 @@ namespace
 						lexy::nullopt,
 						const global_lexeme_type comment_inline) -> void
 						{
-							if constexpr (allocatable) { trim_right_whitespace(key); }
+							trim_right_whitespace(key);
 							state.property(position, std::forward<string_type>(key), {}, comment_inline);
 						},
 						// key =
@@ -387,7 +386,7 @@ namespace
 						lexy::nullopt,
 						lexy::nullopt) -> void
 						{
-							if constexpr (allocatable) { trim_right_whitespace(key); }
+							trim_right_whitespace(key);
 							state.property(position, std::forward<string_type>(key), {}, {});
 						});
 			}();
@@ -460,8 +459,8 @@ namespace
 							dsl::identifier(
 									// begin with printable
 									dsl::unicode::print,
-									// continue with printable, but excluding '\r', '\n', '\r\n' and ']'
-									dsl::unicode::print - dsl::unicode::newline - dsl::square_bracketed.close()) +
+									// continue with printable, but excluding ']'
+									dsl::unicode::print - dsl::square_bracketed.close()) +
 							dsl::square_bracketed.close();
 				}
 			}();
