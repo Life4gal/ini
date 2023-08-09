@@ -44,31 +44,31 @@ namespace
 			: string_{string} {}
 
 		// for appender_traits::allocatable
-		constexpr auto push_back(const value_type c) -> void { string_.push_back(c); }
+		auto push_back(const value_type c) -> void { string_.push_back(c); }
 
-		[[nodiscard]] constexpr auto data() const noexcept -> const string_type& { return string_; }
+		[[nodiscard]] auto data() const noexcept -> const string_type& { return string_; }
 
-		friend constexpr auto operator<=>(const UserString& lhs, const UserString& rhs) noexcept -> auto { return lhs.data() <=> rhs.data(); }
+		friend auto operator<=>(const UserString& lhs, const UserString& rhs) noexcept -> auto { return lhs.data() <=> rhs.data(); }
 
-		friend constexpr auto operator<=>(const UserString& lhs, const string_type& rhs) noexcept -> auto { return lhs.data() <=> rhs; }
+		friend auto operator<=>(const UserString& lhs, const string_type& rhs) noexcept -> auto { return lhs.data() <=> rhs; }
 
-		friend constexpr auto operator<=>(const string_type& lhs, const UserString& rhs) noexcept -> auto { return lhs <=> rhs.data(); }
+		friend auto operator<=>(const string_type& lhs, const UserString& rhs) noexcept -> auto { return lhs <=> rhs.data(); }
 
-		friend constexpr auto operator<=>(const UserString& lhs, const string_view_type rhs) noexcept -> auto { return lhs.data() <=> rhs; }
+		friend auto operator<=>(const UserString& lhs, const string_view_type rhs) noexcept -> auto { return lhs.data() <=> rhs; }
 
-		friend constexpr auto operator<=>(const string_view_type lhs, const UserString& rhs) noexcept -> auto { return lhs <=> rhs.data(); }
+		friend auto operator<=>(const string_view_type lhs, const UserString& rhs) noexcept -> auto { return lhs <=> rhs.data(); }
 
-		friend constexpr auto operator<=>(const UserString& lhs, const string_type::pointer rhs) noexcept -> auto { return lhs.data() <=> rhs; }
+		friend auto operator<=>(const UserString& lhs, const string_type::pointer rhs) noexcept -> auto { return lhs.data() <=> rhs; }
 
-		friend constexpr auto operator<=>(const string_type::pointer lhs, const UserString& rhs) noexcept -> auto { return lhs <=> rhs.data(); }
-
-		template<std::size_t N>
-		friend constexpr auto operator<=>(const UserString& lhs, const string_type::value_type (&rhs)[N]) noexcept -> auto { return lhs.data() <=> rhs; }
+		friend auto operator<=>(const string_type::pointer lhs, const UserString& rhs) noexcept -> auto { return lhs <=> rhs.data(); }
 
 		template<std::size_t N>
-		friend constexpr auto operator<=>(const string_type::value_type (&lhs)[N], const UserString& rhs) noexcept -> auto { return lhs <=> rhs.data(); }
+		friend auto operator<=>(const UserString& lhs, const string_type::value_type (&rhs)[N]) noexcept -> auto { return lhs.data() <=> rhs; }
 
-		[[nodiscard]] constexpr explicit(false) operator string_view_type() const noexcept { return string_; }
+		template<std::size_t N>
+		friend auto operator<=>(const string_type::value_type (&lhs)[N], const UserString& rhs) noexcept -> auto { return lhs <=> rhs.data(); }
+
+		[[nodiscard]] explicit(false) operator string_view_type() const noexcept { return string_; }
 	};
 
 	// UserString::push_back
