@@ -397,8 +397,8 @@ namespace
 			constexpr static auto name = "[blank line]";
 
 			constexpr static auto rule =
-					// dsl::peek(dsl::newline | dsl::unicode::blank) >> dsl::until(dsl::newline).or_eof();
-					dsl::newline;
+					dsl::peek(dsl::newline | dsl::unicode::blank) >>
+					dsl::eol;
 
 			constexpr static auto value = callback<void>(
 					[](auto&      state) -> void { state.blank_line(); });
@@ -409,18 +409,14 @@ namespace
 			constexpr static auto name = "[property or comment]";
 
 			constexpr static auto rule =
-					(dsl::peek(dsl::newline | dsl::unicode::blank) >> dsl::p<blank_line>) |
+					// blank line
+					(dsl::p<blank_line>)
+					|
 					// comment
-					// todo: sign?
-					(dsl::peek(comment_indication) >>
-					(dsl::p<comment_line> +
-					// newline
-					dsl::newline)) |
-					// variable
-					(dsl::else_ >>
-					(dsl::scan +
-					// newline
-					dsl::newline));
+					(dsl::p<comment_line> >> dsl::eol)
+					|
+					// property
+					(dsl::else_ >> (dsl::scan + dsl::eol));
 
 			template<typename Context, typename Reader, typename State>
 			constexpr static auto scan(lexy::rule_scanner<Context, Reader>& scanner, [[maybe_unused]] State& state) -> scan_result
@@ -498,6 +494,7 @@ namespace
 
 			// end with 'eof' or next '[' (section begin)
 			constexpr static auto rule =
+					// fixme: currently only the comment in front of the first section is treated as belonging to that section, which means that the comment in other cases is treated as hitting [comment] when parsing [property or comment].
 					dsl::if_(
 							dsl::p<comment_line>
 							// newline
@@ -550,10 +547,13 @@ namespace
 			const ini::string_view_type filename) -> void
 	{
 		#if defined(GAL_INI_DEBUG_TRACE)
-		lexy::trace<grammar::context<State>>(
+		lexy::trace<grammar::file_context>(
 				stderr,
 				buffer,
+				state,
 				{.flags = lexy::visualize_fancy});
+
+		state.trace_finish();
 		#endif
 
 		if (const auto result =
@@ -619,7 +619,6 @@ namespace
 		return ExtractResult::SUCCESS;
 	}
 
-	// template<ini::function_ref_t SectionAppender, ini::function_ref_t KvAppender>
 	template<typename String>
 	class Extractor
 	{
@@ -638,6 +637,13 @@ namespace
 		// never called
 		using kv_argument_type = std::conditional_t<allocatable, typename traits_type::argument_type, std::basic_string_view<char_type>>;
 		static auto error_kv_appender(kv_argument_type, kv_argument_type) -> typename traits_type::kv_append_result { throw std::runtime_error{"fixme"}; };
+
+		auto redirect(const global_position_type position) noexcept -> void
+		{
+			const auto location = lexy::get_input_location(buffer_, position, buffer_anchor_);
+
+			buffer_anchor_ = location.anchor();
+		}
 
 		auto do_append_section(argument_type section_name) -> typename traits_type::section_append_result
 		{
@@ -668,12 +674,9 @@ namespace
 		section_appender_type section_appender_;
 		kv_appender_type      kv_appender_;
 
-		auto redirect(const global_position_type position) noexcept -> void
-		{
-			const auto location = lexy::get_input_location(buffer_, position, buffer_anchor_);
-
-			buffer_anchor_ = location.anchor();
-		}
+		#if defined(GAL_INI_DEBUG_TRACE)
+		int debug_tracing_ = true;
+		#endif
 
 	public:
 		Extractor(
@@ -697,6 +700,12 @@ namespace
 		{
 			redirect(position);
 
+			#if defined(GAL_INI_DEBUG_TRACE)
+
+			if (debug_tracing_) { return; }
+
+			#endif
+
 			const auto [name, kv_appender, inserted] = this->do_append_section(std::forward<argument_type>(section_name));
 
 			if (not inserted)
@@ -719,6 +728,12 @@ namespace
 		{
 			redirect(position);
 
+			#if defined(GAL_INI_DEBUG_TRACE)
+
+			if (debug_tracing_) { return; }
+
+			#endif
+
 			const auto [inserted_key, inserted_value, inserted] = this->do_append_kv(std::forward<argument_type>(key), std::forward<argument_type>(value));
 
 			if (not inserted)
@@ -736,6 +751,14 @@ namespace
 		}
 
 		auto blank_line() const noexcept -> void { (void)this; }
+
+		#if defined(GAL_INI_DEBUG_TRACE)
+		auto trace_finish() -> void
+		{
+			buffer_anchor_ = global_buffer_anchor_type{buffer_};
+			debug_tracing_ = 0;
+		}
+		#endif
 	};
 }
 
