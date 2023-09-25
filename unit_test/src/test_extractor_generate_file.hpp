@@ -13,6 +13,9 @@
 
 #define GROUP3_NAME "inline comment"
 
+#define GROUP4_NAME "invalid line"
+#define GROUP5_NAME "key only"
+
 inline auto do_generate_file() -> void
 {
 	const std::filesystem::path file_path{TEST_INI_EXTRACTOR_FILE_PATH};
@@ -55,6 +58,18 @@ inline auto do_generate_file() -> void
 	file << "   key4   =      value4 ; kv4\n";
 	file << "\n";
 
+	file << '#' << GROUP4_NAME << '\n';
+	file << "[" GROUP4_NAME << "]\n";
+	file << "   invalid    line   \n";
+	file << "   =invalid line    \n";
+	file << "  =     invalid line   \n";
+
+	file << '#' << GROUP5_NAME << '\n';
+	file << "[" GROUP5_NAME << "]\n";
+	file << "   key1=   \n";
+	file << "  key2     =    \n";
+	file << "key3           =   \n";
+
 	file.close();
 }
 
@@ -65,13 +80,15 @@ auto do_check_result(const gal::ini::ExtractResult extract_result, const Context
 
 	"extract_ok"_test = [extract_result] { expect((extract_result == gal::ini::ExtractResult::SUCCESS) >> fatal); };
 
-	"group_size"_test = [&] { expect((data.size() == 3_i) >> fatal); };
+	"group_size"_test = [&] { expect((data.size() == 5_i) >> fatal); };
 
 	"group_name"_test = [&]
 	{
 		expect(data.contains(GROUP1_NAME) >> fatal);
 		expect(data.contains(GROUP2_NAME) >> fatal);
 		expect(data.contains(GROUP3_NAME) >> fatal);
+		expect(data.contains(GROUP4_NAME) >> fatal);
+		expect(data.contains(GROUP5_NAME) >> fatal);
 	};
 
 	"group1"_test = [&]
@@ -123,6 +140,25 @@ auto do_check_result(const gal::ini::ExtractResult extract_result, const Context
 		expect((group.at("key2") == "value2") >> fatal);
 		expect((group.at("key3") == "value3") >> fatal);
 		expect((group.at("key4") == "value4") >> fatal);
+	};
+
+	"group4"_test = [&]
+	{
+		const auto& group = data.at(GROUP4_NAME);
+
+		expect((group.empty() == "empty"_b) >> fatal);
+		expect((group.size() == 0_i) >> fatal);
+	};
+
+	"group5"_test = [&]
+	{
+		const auto& group = data.at(GROUP5_NAME);
+
+		expect((group.size() == 3_i) >> fatal);
+
+		expect(group.contains("key1") >> fatal);
+		expect(group.contains("key2") >> fatal);
+		expect(group.contains("key3") >> fatal);
 	};
 }
 

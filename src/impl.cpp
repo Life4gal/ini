@@ -222,7 +222,8 @@ namespace
 							// begin with not '\r', '\n', '\r\n', whitespace or '='
 							dsl::peek(dsl::unicode::print - dsl::unicode::newline - dsl::unicode::blank - dsl::equal_sign),
 							// end until '='
-							dsl::peek(dsl::equal_sign)
+							// fixme: [invalid line] => [[empty_key], [this_line_content]]
+							dsl::peek(dsl::equal_sign / dsl::unicode::newline)
 							)(dsl::unicode::print.error<invalid_name>, string_literal::escape);
 				}
 				else
@@ -363,6 +364,9 @@ namespace
 						string_type                value,
 						lexy::nullopt) -> void
 						{
+							// @see property_name::rule
+							if (key.empty()) { return; }
+
 							trim_right_whitespace(key);
 							trim_right_whitespace(value);
 							state.property(position, std::forward<string_type>(key), std::forward<string_type>(value), {});
